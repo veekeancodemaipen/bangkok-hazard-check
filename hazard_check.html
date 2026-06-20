@@ -123,6 +123,91 @@ body{ font-family:'Sarabun',sans-serif; background:#0f1220; color:#e8eaf0; heigh
 .marker-cluster-medium div { background-color: rgba(192,57,43,0.85); }
 .marker-cluster-large { background-color: rgba(192,57,43,0.7); }
 .marker-cluster-large div { background-color: rgba(192,57,43,0.9); }
+
+/* ─── INSIGHT BAR ─── */
+#insight-bar{
+  background:linear-gradient(90deg,#0f1a2e,#172a4d);
+  border-bottom:1px solid #2a4a7f;
+  padding:7px 16px; font-size:0.8rem; color:#c0d8f0; flex-shrink:0;
+  display:flex; align-items:center; gap:10px; min-height:34px;
+  position:relative; overflow:hidden;
+}
+.insight-text{ flex:1; transition:opacity 0.4s; }
+.insight-dot{
+  display:inline-block; width:8px; height:8px; border-radius:50%;
+  background:#f5a623; margin-right:8px; flex-shrink:0;
+  animation:pulse 2s infinite;
+}
+@keyframes pulse{
+  0%,100%{ opacity:1; } 50%{ opacity:0.4; }
+}
+
+/* ─── EXPORT BUTTON ─── */
+#btn-export{
+  background:#172a4d; color:#f5a623; border:1px solid #f5a623;
+  border-radius:6px; padding:6px 14px; font-size:0.82rem;
+  font-weight:700; cursor:pointer; white-space:nowrap;
+  min-height:36px; transition:all 0.2s;
+}
+#btn-export:hover{ background:#f5a623; color:#0f1220; }
+
+/* ─── DISTRICT PANEL ─── */
+#district-panel{
+  position:absolute; top:10px; right:10px; z-index:800;
+  background:rgba(27,35,64,0.96); border:1px solid #2a3a5c;
+  border-radius:12px; width:240px; box-shadow:0 4px 24px rgba(0,0,0,0.5);
+  backdrop-filter:blur(4px);
+}
+#district-panel-head{
+  padding:10px 14px 8px;
+  display:flex; align-items:center; justify-content:space-between;
+  border-bottom:1px solid #2a3a5c; cursor:pointer;
+}
+#district-panel-head h3{
+  font-size:0.82rem; font-weight:700; color:#f5a623; margin:0;
+}
+#district-toggle{
+  background:none; border:none; color:#8892b0; font-size:1rem;
+  cursor:pointer; padding:0; line-height:1;
+}
+#district-body{ padding:10px 12px; }
+.rank-row{
+  display:flex; align-items:center; gap:6px;
+  margin-bottom:5px; font-size:0.78rem;
+}
+.rank-num{
+  color:#8892b0; width:18px; text-align:right; flex-shrink:0;
+  font-size:0.7rem;
+}
+.rank-name{
+  color:#e8eaf0; flex:1; white-space:nowrap;
+  overflow:hidden; text-overflow:ellipsis;
+}
+.rank-count{
+  color:#f5a623; font-weight:700; font-size:0.78rem;
+  flex-shrink:0; min-width:28px; text-align:right;
+}
+.rank-bar-wrap{
+  width:100%; background:#243050; border-radius:2px;
+  height:4px; margin-top:2px; margin-bottom:2px;
+}
+.rank-bar{
+  height:4px; border-radius:2px;
+  background:linear-gradient(90deg,#f5a623,#e09400);
+}
+#district-empty{
+  font-size:0.78rem; color:#8892b0; text-align:center; padding:8px 0;
+}
+
+/* ─── MOBILE: District panel as bottom sheet ─── */
+@media (max-width:600px){
+  #district-panel{
+    position:fixed; bottom:0; right:0; left:0; top:auto;
+    width:100%; border-radius:12px 12px 0 0; max-height:55vh;
+    overflow-y:auto;
+  }
+  #district-body{ padding:8px 12px 16px; }
+}
 </style>
 </head>
 <body>
@@ -143,11 +228,10 @@ body{ font-family:'Sarabun',sans-serif; background:#0f1220; color:#e8eaf0; heigh
   </div>
 </div>
 
-<!-- SEASONAL BANNER -->
-<div id="seasonal">
-  <span class="badge">⚠️ พีคหน้าฝน</span>
-  มิ.ย.–ต.ค. = เรื่องร้องเรียนพุ่งขึ้น <b>2.3 เท่า</b>จากค่าเฉลี่ย —
-  จุดสีแดงที่เห็นในแผนที่จะหนักขึ้นในช่วงนี้
+<!-- INSIGHT BAR (replaces seasonal banner) -->
+<div id="insight-bar">
+  <span class="insight-dot"></span>
+  <span class="insight-text" id="insight-text">กำลังคำนวณ...</span>
 </div>
 
 <!-- CONTROLS -->
@@ -228,10 +312,23 @@ body{ font-family:'Sarabun',sans-serif; background:#0f1220; color:#e8eaf0; heigh
   <button onclick="resetFilter()" style="background:#243050;color:#e8eaf0;min-height:44px;">ล้างตัวกรอง</button>
 
   <span id="count-badge">แสดง <b id="shown-count">—</b> จุด</span>
+  <button id="btn-export" onclick="exportSummary()" title="คัดลอกสรุปข้อมูลไปยัง clipboard">📊 Export สรุป</button>
 </div>
 
 <!-- MAP -->
 <div id="map">
+  <!-- DISTRICT RANKING PANEL -->
+  <div id="district-panel">
+    <div id="district-panel-head" onclick="toggleDistrictPanel()">
+      <h3>🏆 Top 10 เขต — รายงานค้างแก้มากสุด</h3>
+      <button id="district-toggle" title="ซ่อน/แสดง">▼</button>
+    </div>
+    <div id="district-body">
+      <div id="district-list"></div>
+      <div id="district-empty" style="display:none">ไม่มีข้อมูล</div>
+    </div>
+  </div>
+
   <div id="empty-state">
     <span class="es-icon">🔍</span>
     <div class="es-title">ไม่พบรายงานค้างแก้ที่ตรงกับเงื่อนไขนี้</div>
@@ -340,6 +437,7 @@ function buildLayer(features) {
   if (!mapInitialized) { map.setView(BKK, 12); mapInitialized = true; }
   document.getElementById("shown-count").textContent = features.length.toLocaleString();
   document.getElementById("empty-state").style.display = features.length === 0 ? "block" : "none";
+  updateRanking(features);
 }
 
 // ─── Filter ───────────────────────────────────────────────
@@ -378,7 +476,154 @@ function resetFilter() {
   applyFilter();
 }
 
+// ─── District Ranking ────────────────────────────────────
+let _lastFiltered = [];
+
+function updateRanking(features) {
+  _lastFiltered = features;
+  const counts = {};
+  features.forEach(ft => {
+    const d = ft.properties.district || "ไม่ระบุ";
+    counts[d] = (counts[d] || 0) + 1;
+  });
+  const sorted = Object.entries(counts).sort((a,b) => b[1]-a[1]).slice(0,10);
+  const max = sorted.length ? sorted[0][1] : 1;
+
+  const list = document.getElementById("district-list");
+  const empty = document.getElementById("district-empty");
+
+  if (!sorted.length) {
+    list.innerHTML = "";
+    empty.style.display = "block";
+    return;
+  }
+  empty.style.display = "none";
+  list.innerHTML = sorted.map(([name, cnt], idx) => `
+    <div class="rank-row">
+      <span class="rank-num">${idx+1}</span>
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;gap:4px">
+          <span class="rank-name" title="${name}">${name}</span>
+          <span class="rank-count">${cnt}</span>
+        </div>
+        <div class="rank-bar-wrap">
+          <div class="rank-bar" style="width:${Math.round(cnt/max*100)}%"></div>
+        </div>
+      </div>
+    </div>
+  `).join("");
+}
+
+function toggleDistrictPanel() {
+  const body = document.getElementById("district-body");
+  const btn  = document.getElementById("district-toggle");
+  const hidden = body.style.display === "none";
+  body.style.display = hidden ? "" : "none";
+  btn.textContent = hidden ? "▼" : "▶";
+}
+
+// ─── Export Summary ───────────────────────────────────────
+function exportSummary() {
+  const cat    = document.getElementById("f-cat").value || "ทั้งหมด";
+  const minAge = document.getElementById("f-age").value;
+  const dist   = document.getElementById("f-dist").value || "ทุกเขต";
+  const ageLbl = minAge === "0" ? "ทุกช่วงเวลา"
+               : minAge === "180" ? "ค้างมากกว่า 6 เดือน"
+               : minAge === "365" ? "ค้างมากกว่า 1 ปี"
+               : "≥ 2 ปี";
+  const total = _lastFiltered.length;
+
+  // Top 5 districts from current filter
+  const counts = {};
+  _lastFiltered.forEach(ft => {
+    const d = ft.properties.district || "ไม่ระบุ";
+    counts[d] = (counts[d] || 0) + 1;
+  });
+  const top5 = Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  const top5Txt = top5.map(([n,c],i) => `${i+1}. เขต${n} — ${c} จุด`).join("\n");
+
+  const today = new Date().toLocaleDateString("th-TH", {year:"numeric",month:"long",day:"numeric"});
+
+  const txt = `Bangkok Hazard Check — สรุปข้อมูล ${today}
+ตัวกรอง: ${cat} / ${ageLbl} / ${dist}
+จำนวนรายงานค้างแก้: ${total.toLocaleString()} จุด
+
+Top 5 เขต:
+${top5Txt}
+
+แหล่งข้อมูล: Traffy Fondue | Bangkok Hazard Check
+https://veekeancodemaipen.github.io/bangkok-hazard-check/hazard_check.html`;
+
+  navigator.clipboard.writeText(txt)
+    .then(() => {
+      const btn = document.getElementById("btn-export");
+      btn.textContent = "✅ คัดลอกแล้ว!";
+      setTimeout(() => { btn.textContent = "📊 Export สรุป"; }, 2000);
+    })
+    .catch(() => {
+      // fallback for browsers that block clipboard without HTTPS
+      const ta = document.createElement("textarea");
+      ta.value = txt; ta.style.position = "fixed"; ta.style.opacity = "0";
+      document.body.appendChild(ta); ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+      const btn = document.getElementById("btn-export");
+      btn.textContent = "✅ คัดลอกแล้ว!";
+      setTimeout(() => { btn.textContent = "📊 Export สรุป"; }, 2000);
+    });
+}
+
+// ─── Insight Bar ──────────────────────────────────────────
+let _insightIdx = 0;
+let _insightTimer = null;
+
+function computeInsights() {
+  const all = DATA.features;
+  const total = all.length;
+
+  // Insight 1: district with most repeat reports
+  const repeatCounts = {};
+  all.filter(ft => ft.properties.is_repeat).forEach(ft => {
+    const d = ft.properties.district || "ไม่ระบุ";
+    repeatCounts[d] = (repeatCounts[d] || 0) + 1;
+  });
+  const topRepeat = Object.entries(repeatCounts).sort((a,b)=>b[1]-a[1])[0] || ["—", 0];
+
+  // Insight 2: % over 1 year + rainy season note
+  const over1yr = all.filter(ft => ft.properties.age_days >= 365).length;
+  const pctOver1yr = Math.round(over1yr / total * 100);
+
+  // Insight 3: points where cell_n >= 3
+  const clusterPts = all.filter(ft => ft.properties.cell_n >= 3).length;
+
+  return [
+    `🔴 จุดเรื้อรังที่แจ้งซ้ำมากสุด: เขต${topRepeat[0]} — ${topRepeat[1]} ครั้ง ในบริเวณเดิม`,
+    `⏱️ ${pctOver1yr}% ของรายงานค้างมาแล้วเกิน 1 ปี — มิ.ย.–ต.ค. รายงานพุ่งขึ้น 2.3 เท่า`,
+    `📍 ${clusterPts.toLocaleString()} จุดในพื้นที่เดียวกันถูกแจ้งซ้ำ ≥3 ครั้ง แต่ยังไม่ถูกแก้`,
+  ];
+}
+
+function startInsightRotation() {
+  const insights = computeInsights();
+  const el = document.getElementById("insight-text");
+
+  function show(idx) {
+    el.style.opacity = "0";
+    setTimeout(() => {
+      el.textContent = insights[idx % insights.length];
+      el.style.opacity = "1";
+    }, 400);
+  }
+
+  show(0);
+  _insightTimer = setInterval(() => {
+    _insightIdx = (_insightIdx + 1) % insights.length;
+    show(_insightIdx);
+  }, 8000);
+}
+
 // ─── Init ─────────────────────────────────────────────────
+startInsightRotation();
 applyFilter();
 </script>
 </body>
