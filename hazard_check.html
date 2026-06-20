@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="th">
 <head>
 <meta charset="UTF-8">
@@ -733,7 +733,7 @@ const AQI_THAI = {
 
 async function loadAQI() {
   try {
-    const res = await fetch("http://localhost:8001/api/aqi");
+    const res = await fetch("http://18.138.102.113:8001/api/aqi");
     if (!res.ok) return;
     const stations = await res.json();
     stations.forEach(s => {
@@ -833,7 +833,7 @@ async function sendQuery(query) {
   showLoading();
 
   try {
-    const res = await fetch("http://localhost:8001/api/journey-query", {
+    const res = await fetch("http://18.138.102.113:8001/api/journey-query", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ query })
