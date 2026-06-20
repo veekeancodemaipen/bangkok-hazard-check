@@ -1,0 +1,3 @@
+hazard_full.geojson
+*.pyc
+__pycache__/
