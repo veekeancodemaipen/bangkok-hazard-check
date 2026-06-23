@@ -1,0 +1,1441 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bangkok Journey Intelligence — ถามได้เลย ปลอดภัยหรือเปล่า?</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css"/>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --bg:#0d1117; --bg2:#161b27; --bg3:#1e2538; --border:#2a3550;
+  --amber:#F6AD55; --amber2:#ed8a1c;
+  --text:#e2e8f0; --muted:#7a8aaa;
+  --green:#48bb78; --red:#fc8181; --purple:#b794f4;
+}
+html,body{height:100%;overflow:hidden;}
+body{font-family:'Sarabun',sans-serif;background:var(--bg);color:var(--text);display:flex;flex-direction:column;}
+
+/* ─── HEADER ─── */
+#hdr{
+  background:var(--bg2);border-bottom:2px solid var(--amber);
+  padding:9px 18px;flex-shrink:0;
+  display:flex;align-items:center;gap:14px;flex-wrap:wrap;min-height:54px;
+}
+.logo{display:flex;align-items:center;gap:10px;}
+.logo-icon{
+  width:34px;height:34px;background:var(--amber);border-radius:8px;
+  display:flex;align-items:center;justify-content:center;font-size:1.3rem;flex-shrink:0;
+}
+.logo h1{font-size:1rem;font-weight:800;color:var(--amber);line-height:1.1;}
+.logo .sub{font-size:0.62rem;color:var(--muted);}
+.hdr-stats{display:flex;gap:10px;flex-wrap:wrap;}
+.sc{
+  background:var(--bg3);border:1px solid var(--border);border-radius:20px;
+  padding:2px 11px;font-size:0.72rem;display:flex;align-items:center;gap:5px;
+}
+.sc .v{color:var(--amber);font-weight:700;}
+.live{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 2s infinite;flex-shrink:0;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.3;}}
+.src-badges{margin-left:auto;display:flex;gap:6px;align-items:center;}
+.src{font-size:0.62rem;color:var(--muted);border:1px solid var(--border);border-radius:4px;padding:2px 7px;}
+
+/* ─── LAYOUT ─── */
+#main{flex:1;display:flex;overflow:hidden;position:relative;}
+
+/* ─── CHAT PANEL ─── */
+#chat{
+  width:370px;min-width:330px;background:var(--bg2);
+  border-right:1px solid var(--border);
+  display:flex;flex-direction:column;flex-shrink:0;z-index:10;
+}
+#panel-tabs{display:flex;border-bottom:1px solid var(--border);flex-shrink:0;}
+.ptab{
+  flex:1;padding:7px 0;font-size:0.78rem;font-weight:600;
+  background:none;border:none;border-bottom:2px solid transparent;
+  color:var(--muted);cursor:pointer;font-family:'Sarabun',sans-serif;transition:all .15s;
+}
+.ptab.on{color:var(--amber);border-bottom-color:var(--amber);}
+.ptab:hover:not(.on){color:var(--text);}
+
+#chat-hdr{padding:12px 15px 9px;border-bottom:1px solid var(--border);flex-shrink:0;}
+#chat-hdr h2{font-size:0.92rem;font-weight:700;color:var(--amber);margin-bottom:1px;}
+#chat-hdr p{font-size:0.67rem;color:var(--muted);}
+
+/* ─── SCREENER ─── */
+#screener{flex:1;display:none;flex-direction:column;overflow:hidden;}
+#screener-hdr{
+  padding:10px 14px 8px;border-bottom:1px solid var(--border);flex-shrink:0;
+  display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;
+}
+#screener-hdr h3{font-size:0.85rem;font-weight:700;color:var(--amber);}
+#screener-hdr p{font-size:0.65rem;color:var(--muted);}
+.dl-btn{
+  background:var(--bg3);border:1px solid var(--border);color:var(--muted);
+  border-radius:6px;padding:4px 10px;font-size:0.72rem;cursor:pointer;
+  font-family:'Sarabun',sans-serif;transition:all .15s;white-space:nowrap;
+}
+.dl-btn:hover{border-color:var(--amber);color:var(--amber);}
+#screener-wrap{flex:1;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--border) var(--bg2);}
+#screener-tbl{width:100%;border-collapse:collapse;font-size:0.76rem;}
+#screener-tbl th{
+  position:sticky;top:0;background:var(--bg2);color:var(--muted);
+  padding:7px 10px;text-align:left;cursor:pointer;white-space:nowrap;
+  border-bottom:1px solid var(--border);user-select:none;font-weight:600;
+}
+#screener-tbl th:hover{color:var(--amber);}
+#screener-tbl th.sort-asc::after{content:' ▲';}
+#screener-tbl th.sort-desc::after{content:' ▼';}
+#screener-tbl td{padding:6px 10px;border-bottom:1px solid rgba(42,53,80,.5);vertical-align:middle;}
+#screener-tbl tr:hover td{background:rgba(246,173,85,.05);}
+.debt-bar{display:flex;align-items:center;gap:6px;}
+.debt-fill{height:8px;border-radius:4px;background:var(--amber);opacity:.8;min-width:2px;transition:width .3s;}
+.debt-num{color:var(--amber);font-weight:700;min-width:34px;font-size:0.8rem;}
+.rank-badge{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:20px;height:20px;border-radius:50%;font-size:0.65rem;font-weight:700;
+  background:var(--bg3);color:var(--muted);flex-shrink:0;
+}
+.rank-badge.gold{background:#78350010;color:#fbbf24;}
+.rank-badge.silver{background:#37415150;color:#94a3b8;}
+.rank-badge.bronze{background:#431a0550;color:#cd7c3f;}
+.delta-up{color:#fc8181;font-size:0.72rem;font-weight:700;}
+.delta-dn{color:#48bb78;font-size:0.72rem;font-weight:700;}
+.delta-nc{color:var(--muted);font-size:0.72rem;}
+
+/* ─── SEASONAL PANEL ─── */
+#seasonal{padding:12px 14px 14px;border-top:1px solid var(--border);flex-shrink:0;}
+#seasonal h4{font-size:0.78rem;font-weight:700;color:var(--amber);margin-bottom:4px;}
+#seasonal .seas-note{font-size:0.60rem;color:var(--muted);margin-bottom:8px;}
+.seas-bars{display:flex;align-items:flex-end;gap:3px;height:44px;}
+.seas-bar{flex:1;border-radius:3px 3px 0 0;position:relative;min-width:0;cursor:default;transition:opacity .15s;}
+.seas-bar:hover{opacity:.8;}
+.seas-label{display:flex;justify-content:space-around;margin-top:3px;}
+.seas-lbl{flex:1;text-align:center;font-size:0.52rem;color:var(--muted);min-width:0;overflow:hidden;}
+.seas-lbl.curr{color:var(--amber);font-weight:700;}
+.seas-curr-line{
+  font-size:0.70rem;color:var(--text);margin-top:7px;
+  background:var(--bg3);border:1px solid var(--border);border-radius:6px;
+  padding:5px 9px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+}
+.seas-factor{color:var(--amber);font-weight:800;font-size:1rem;}
+
+#msgs{
+  flex:1;overflow-y:auto;padding:12px 12px 6px;
+  display:flex;flex-direction:column;gap:9px;
+  scrollbar-width:thin;scrollbar-color:var(--border) var(--bg2);
+}
+.msg{max-width:92%;font-size:0.84rem;line-height:1.6;padding:8px 12px;border-radius:11px;animation:fadeUp .2s ease;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(5px);}to{opacity:1;transform:none;}}
+.msg.bot{background:var(--bg3);color:#c8d8f0;align-self:flex-start;border-bottom-left-radius:3px;}
+.msg.user{background:var(--amber);color:#0d1117;align-self:flex-end;border-bottom-right-radius:3px;font-weight:600;}
+.msg.bot .meta{font-size:0.67rem;color:var(--muted);margin-top:6px;border-top:1px solid var(--border);padding-top:5px;display:flex;gap:6px;flex-wrap:wrap;}
+.mt{background:rgba(246,173,85,.12);color:var(--amber);border-radius:4px;padding:1px 6px;font-size:0.63rem;}
+
+.risk-badge{display:inline-flex;align-items:center;gap:8px;border-radius:8px;padding:6px 11px;margin-bottom:7px;max-width:100%;}
+.risk-score{font-size:1.5rem;font-weight:800;line-height:1;flex-shrink:0;}
+.risk-meta-level{font-size:0.72rem;font-weight:700;}
+.risk-meta-comp{font-size:0.60rem;color:var(--muted);}
+
+#map-loading{
+  position:absolute;top:0;left:0;right:0;bottom:0;
+  background:rgba(13,17,23,.85);display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:12px;z-index:500;
+  font-size:0.88rem;color:var(--muted);pointer-events:none;
+}
+#map-loading.hidden{display:none;}
+.load-spinner{width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--amber);border-radius:50%;animation:spin .8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+.reasoning-wrap{margin-top:8px;border-top:1px solid var(--border);padding-top:6px;}
+.reasoning-toggle{
+  background:none;border:none;color:var(--muted);font-size:0.68rem;cursor:pointer;
+  padding:0;font-family:'Sarabun',sans-serif;display:flex;align-items:center;gap:4px;
+}
+.reasoning-toggle:hover{color:var(--amber);}
+.reasoning-body{
+  display:none;margin-top:6px;font-size:0.72rem;color:#8899bb;
+  background:rgba(14,20,40,0.6);border-radius:6px;padding:8px 10px;
+  line-height:1.7;white-space:pre-wrap;
+}
+.reasoning-body.open{display:block;}
+
+.typing{align-self:flex-start;padding:9px 12px;background:var(--bg3);border-radius:11px;border-bottom-left-radius:3px;}
+.dots span{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--amber);margin:0 2px;animation:bounce 1.2s infinite;}
+.dots span:nth-child(2){animation-delay:.2s;}.dots span:nth-child(3){animation-delay:.4s;}
+@keyframes bounce{0%,60%,100%{transform:translateY(0);}30%{transform:translateY(-6px);}}
+
+#chips-wrap{padding:0 12px 8px;flex-shrink:0;}
+#chips-wrap p{font-size:0.65rem;color:var(--muted);margin-bottom:5px;}
+.chip{
+  display:block;width:100%;background:var(--bg3);border:1px solid var(--border);
+  border-radius:8px;padding:6px 10px;font-size:0.73rem;color:#a0b8d0;
+  cursor:pointer;text-align:left;transition:all .15s;margin-bottom:5px;
+  font-family:'Sarabun',sans-serif;
+}
+.chip:hover{background:rgba(246,173,85,.1);border-color:var(--amber);color:var(--amber);}
+
+#input-row{
+  display:flex;gap:7px;padding:9px 12px 12px;
+  border-top:1px solid var(--border);flex-shrink:0;
+}
+#inp{
+  flex:1;background:var(--bg);color:var(--text);border:1.5px solid var(--border);
+  border-radius:9px;padding:7px 11px;font-size:0.85rem;outline:none;
+  font-family:'Sarabun',sans-serif;
+}
+#inp:focus{border-color:var(--amber);}
+#send{
+  background:var(--amber);color:#0d1117;border:none;border-radius:9px;
+  padding:7px 15px;font-size:0.85rem;font-weight:700;cursor:pointer;
+  font-family:'Sarabun',sans-serif;
+}
+#send:hover{background:var(--amber2);}
+#send:disabled{opacity:.5;cursor:not-allowed;}
+
+/* ─── MAP SECTION ─── */
+#mapsec{flex:1;display:flex;flex-direction:column;position:relative;overflow:hidden;}
+#maptb{
+  background:var(--bg2);border-bottom:1px solid var(--border);
+  padding:6px 13px;display:flex;gap:9px;align-items:center;flex-wrap:wrap;flex-shrink:0;min-height:46px;
+}
+#maptb label{font-size:0.78rem;color:var(--muted);margin-right:2px;}
+#maptb select,#maptb input[type=text]{
+  background:var(--bg3);color:var(--text);border:1px solid var(--border);
+  border-radius:6px;padding:4px 8px;font-size:0.78rem;font-family:'Sarabun',sans-serif;
+}
+#maptb .tbtn{
+  background:var(--amber);color:#0d1117;border:none;border-radius:6px;
+  padding:5px 14px;font-size:0.78rem;font-weight:700;cursor:pointer;font-family:'Sarabun',sans-serif;
+}
+#maptb .tbtn:hover{background:var(--amber2);}
+#maptb .tbtn.ghost{background:var(--bg3);color:var(--text);border:1px solid var(--border);}
+#maptb .tbtn.ghost.on{border-color:var(--amber);color:var(--amber);}
+#cnt{margin-left:auto;font-size:0.72rem;color:var(--muted);}
+#cnt b{color:var(--amber);}
+
+#map{flex:1;}
+
+/* AQI legend */
+#aqi-leg{
+  position:absolute;bottom:30px;left:10px;z-index:800;
+  background:rgba(22,27,39,.93);border:1px solid var(--border);border-radius:8px;
+  padding:8px 12px;font-size:0.68rem;color:var(--muted);display:none;
+  backdrop-filter:blur(4px);
+}
+#aqi-leg.show{display:block;}
+#aqi-leg h4{color:var(--text);margin-bottom:5px;font-size:0.73rem;}
+.al{display:flex;align-items:center;gap:6px;margin-bottom:3px;}
+.ad{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+
+/* Map legend (Traffy) */
+#traffy-leg{
+  position:absolute;bottom:30px;right:10px;z-index:800;
+  background:rgba(22,27,39,.93);border:1px solid var(--border);border-radius:8px;
+  padding:8px 12px;font-size:0.68rem;color:var(--muted);
+  backdrop-filter:blur(4px);
+}
+.tl{display:flex;align-items:center;gap:6px;margin-bottom:3px;}
+.td{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+
+/* Insight bar */
+#ins-bar{
+  background:linear-gradient(90deg,#0f1a2e,#172a4d);border-top:1px solid var(--border);
+  padding:4px 15px;font-size:0.73rem;color:#c0d0f0;flex-shrink:0;
+  display:flex;align-items:center;gap:7px;min-height:28px;
+}
+.ins-dot{width:6px;height:6px;border-radius:50%;background:var(--amber);flex-shrink:0;animation:pulse 2s infinite;}
+
+/* Cluster */
+.marker-cluster-small{background-color:rgba(192,57,43,.5);}
+.marker-cluster-small div{background-color:rgba(192,57,43,.8);}
+.marker-cluster-medium{background-color:rgba(192,57,43,.6);}
+.marker-cluster-medium div{background-color:rgba(192,57,43,.85);}
+.marker-cluster-large{background-color:rgba(192,57,43,.7);}
+.marker-cluster-large div{background-color:rgba(192,57,43,.9);}
+
+/* Popup */
+.pc{font-family:'Sarabun',sans-serif;min-width:190px;}
+.pc .ph{font-weight:700;font-size:0.88rem;margin-bottom:4px;}
+.pc .ps{font-size:0.78rem;margin:2px 0;}
+.pc .pd{font-size:0.72rem;color:#555;margin-top:4px;border-top:1px solid #eee;padding-top:4px;}
+.rb{display:inline-block;background:#c0392b;color:#fff;font-size:0.6rem;padding:1px 4px;border-radius:3px;margin-left:4px;}
+
+/* ─── DIGEST PANEL ─── */
+#digest-panel{flex:1;display:none;flex-direction:column;overflow:hidden;}
+#digest-hdr{padding:10px 14px 8px;border-bottom:1px solid var(--border);flex-shrink:0;}
+#digest-hdr h3{font-size:0.85rem;font-weight:700;color:var(--amber);}
+#digest-hdr p{font-size:0.65rem;color:var(--muted);}
+#digest-body{flex:1;overflow-y:auto;padding:14px;scrollbar-width:thin;scrollbar-color:var(--border) var(--bg2);}
+.digest-text{font-size:0.81rem;line-height:1.9;color:#c8d8f0;white-space:pre-wrap;margin-bottom:16px;
+  background:rgba(246,173,85,.04);border-left:3px solid rgba(246,173,85,.4);padding:10px 12px;border-radius:0 6px 6px 0;}
+.digest-unavail{text-align:center;color:var(--muted);padding:40px 0;}
+.digest-unavail .du-icon{font-size:2rem;margin-bottom:8px;}
+.digest-gen{font-size:0.63rem;color:var(--muted);margin-bottom:12px;}
+.digest-mini-tbl{width:100%;border-collapse:collapse;font-size:0.74rem;margin-top:6px;}
+.digest-mini-tbl th{color:var(--muted);padding:5px 8px;border-bottom:1px solid var(--border);text-align:left;font-weight:600;}
+.digest-mini-tbl td{padding:5px 8px;border-bottom:1px solid rgba(42,53,80,.4);}
+.digest-mini-tbl tr:hover td{background:rgba(246,173,85,.05);}
+/* Tab badge */
+.tab-badge{
+  display:inline-flex;align-items:center;justify-content:center;
+  min-width:16px;height:16px;border-radius:8px;
+  background:#fc8181;color:#0d1117;font-size:0.58rem;font-weight:800;
+  padding:0 3px;margin-left:4px;vertical-align:middle;line-height:1;
+}
+.tab-badge:empty{display:none;}
+
+/* ─── WATCHLIST ─── */
+.pin-btn{background:none;border:none;cursor:pointer;font-size:0.85rem;opacity:.28;transition:opacity .15s;padding:0 3px;line-height:1;}
+.pin-btn.pinned{opacity:1;}
+.pin-btn:hover{opacity:.75;}
+#wl-banner{
+  background:linear-gradient(90deg,#1a2540,#172a4d);
+  border-bottom:1px solid rgba(246,173,85,.5);padding:7px 14px;
+  font-size:0.73rem;display:none;align-items:center;gap:7px;flex-wrap:wrap;flex-shrink:0;
+}
+#wl-banner.show{display:flex;}
+.wl-tag{
+  background:rgba(246,173,85,.12);border:1px solid var(--amber);
+  border-radius:12px;padding:2px 9px;color:var(--amber);font-weight:700;font-size:0.68rem;cursor:pointer;
+}
+.wl-tag:hover{opacity:.75;}
+.wl-clear{margin-left:auto;background:none;border:none;color:var(--muted);cursor:pointer;font-size:0.67rem;font-family:'Sarabun',sans-serif;}
+.wl-clear:hover{color:var(--red);}
+
+/* ─── TREND SPARKLINE ─── */
+.trend-row td{padding:0 !important;border:none;}
+.trend-wrap{padding:6px 10px 10px 10px;background:rgba(13,17,23,.7);border-bottom:1px solid var(--border);}
+.trend-btn{background:none;border:none;cursor:pointer;font-size:0.7rem;opacity:.3;transition:opacity .15s;padding:0 2px;line-height:1;vertical-align:middle;}
+.trend-btn:hover,.trend-btn.on{opacity:1;}
+.share-btn{background:none;border:none;cursor:pointer;font-size:0.75rem;opacity:.28;transition:opacity .15s;padding:0 3px;line-height:1;}
+.share-btn:hover{opacity:1;}
+
+/* ─── ROUTE RISK ─── */
+#route-risk-wrap{padding:9px 14px 11px;border-top:1px solid var(--border);flex-shrink:0;background:var(--bg2);}
+#route-risk-wrap h4{font-size:0.77rem;font-weight:700;color:var(--amber);margin-bottom:6px;}
+.rr-form{display:flex;gap:5px;align-items:center;flex-wrap:wrap;}
+.rr-sel{background:var(--bg3);color:var(--text);border:1px solid var(--border);border-radius:6px;
+  padding:4px 7px;font-size:0.72rem;font-family:'Sarabun',sans-serif;flex:1;min-width:90px;}
+.rr-btn{background:var(--amber);color:#0d1117;border:none;border-radius:6px;
+  padding:5px 12px;font-size:0.75rem;font-weight:700;cursor:pointer;
+  font-family:'Sarabun',sans-serif;white-space:nowrap;}
+.rr-btn:hover{background:var(--amber2);}
+.rr-result{margin-top:8px;}
+#toast{
+  position:fixed;bottom:22px;left:50%;transform:translateX(-50%);
+  background:var(--bg3);border:1px solid var(--amber);color:var(--amber);
+  padding:7px 20px;border-radius:20px;font-size:0.78rem;z-index:9999;
+  opacity:0;pointer-events:none;transition:opacity .2s;
+}
+#toast.show{opacity:1;}
+
+/* Mobile tabs */
+#m-tabs{display:none;background:var(--bg2);border-top:1px solid var(--border);flex-shrink:0;}
+.mt-btn{flex:1;padding:9px 4px;font-size:0.75rem;color:var(--muted);text-align:center;cursor:pointer;border:none;background:none;font-family:'Sarabun',sans-serif;}
+.mt-btn.on{color:var(--amber);font-weight:700;}
+
+@media(max-width:768px){
+  #chat{
+    position:absolute;bottom:0;left:0;right:0;width:100%;height:65vh;
+    border-right:none;border-top:1px solid var(--border);border-radius:14px 14px 0 0;
+    transform:translateY(100%);transition:transform .3s ease;z-index:500;
+  }
+  #chat.open{transform:translateY(0);}
+  #m-tabs{display:flex;}
+  .hdr-stats{display:none;}
+}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header id="hdr">
+  <div class="logo">
+    <div class="logo-icon">🗺️</div>
+    <div>
+      <h1>Bangkok Journey Intelligence</h1>
+      <div class="sub">6-layer compound risk engine (361K รายงาน 5 ปี) · Traffy Fondue × Air4Thai × Typhoon ThaiLLM</div>
+    </div>
+  </div>
+  <div class="hdr-stats">
+    <div class="sc"><div class="live"></div><span class="v" id="h-tickets">—</span><span>รายงานค้างแก้</span></div>
+    <div class="sc"><span>PM2.5 เฉลี่ย กทม.</span><span class="v" id="h-aqi">กำลังโหลด…</span></div>
+    <div class="sc"><span>เขตที่ค้างมากสุด</span><span class="v" id="h-top">—</span></div>
+  </div>
+  <div class="src-badges">
+    <span class="src">Traffy Fondue</span>
+    <span class="src">Air4Thai/PCD</span>
+    <span class="src">Typhoon ThaiLLM</span>
+  </div>
+</header>
+
+<!-- MAIN -->
+<div id="main">
+
+  <!-- CHAT / SCREENER PANEL -->
+  <div id="chat">
+    <div id="panel-tabs">
+      <button class="ptab on" id="ptab-chat" onclick="switchPanel('chat')">🤖 AI Chat</button>
+      <button class="ptab" id="ptab-screener" onclick="switchPanel('screener')">📊 Screener<span class="tab-badge" id="wl-badge"></span></button>
+      <button class="ptab" id="ptab-digest" onclick="switchPanel('digest')">📰 Digest</button>
+    </div>
+    <div id="chat-hdr">
+      <h2>🤖 Journey AI — ถามได้เลย</h2>
+      <p>AI วิเคราะห์คุณภาพอากาศ PM2.5 + ถนน/ทางเท้าค้างแก้ → ตอบเป็นภาษาไทย</p>
+    </div>
+
+    <div id="msgs">
+      <div class="msg bot">
+        สวัสดีครับ! ผม Journey AI ช่วยวิเคราะห์ความปลอดภัยในการเดินทางกรุงเทพฯ<br><br>
+        ถามเกี่ยวกับ <strong style="color:var(--amber)">คุณภาพอากาศ PM2.5</strong>, <strong style="color:var(--amber)">ถนน/ทางเท้าที่มีปัญหา</strong>, หรือว่า <strong style="color:var(--amber)">ควรออกไปไหมวันนี้</strong> ได้เลยครับ
+        <div class="meta">
+          <span class="mt" id="greeting-count">Traffy Fondue กำลังโหลด… รายการ</span>
+          <span class="mt">Air4Thai 79 สถานี</span>
+          <span class="mt">Typhoon AI</span>
+        </div>
+      </div>
+    </div>
+
+    <div id="chips-wrap">
+      <p>ตัวอย่างคำถาม:</p>
+      <button class="chip" onclick="q('ขี่จักรยานไปลุมพินีตอนเช้าพรุ่งนี้ อันตรายไหม?')">🚴 ขี่จักรยานไปลุมพินีตอนเช้าพรุ่งนี้ อันตรายไหม?</button>
+      <button class="chip" onclick="q('PM2.5 ย่านลาดพร้าวตอนนี้เป็นยังไง?')">🌬️ PM2.5 ย่านลาดพร้าวตอนนี้เป็นยังไง?</button>
+      <button class="chip" onclick="q('เขตไหนมีถนนพังค้างมากที่สุดในกรุงเทพ?')">🏛️ เขตไหนมีถนนพังค้างมากที่สุดในกรุงเทพ?</button>
+      <button class="chip" onclick="q('วันนี้ออกไปเดินแถวอนุสาวรีย์ชัยได้ไหม?')">👴 วันนี้ออกไปเดินแถวอนุสาวรีย์ชัยได้ไหม?</button>
+    </div>
+
+    <!-- SCREENER PANEL (hidden by default) -->
+    <div id="screener">
+      <div id="screener-hdr">
+        <div>
+          <h3>📊 District Debt Screener</h3>
+          <p>debt score = ซ้ำซาก × log(อายุ median) · คลิก header เพื่อ sort</p>
+        </div>
+        <button class="dl-btn" onclick="window.open(API+'/api/traffy/export.csv')">⬇ CSV</button>
+      </div>
+      <!-- Watchlist alert banner -->
+      <div id="wl-banner"></div>
+
+      <div id="screener-wrap" style="flex:1;overflow-y:auto;">
+        <table id="screener-tbl">
+          <thead>
+            <tr>
+              <th style="width:26px;cursor:default" title="ติดตามเขต">📌</th>
+              <th data-col="rank">#</th>
+              <th data-col="district">เขต</th>
+              <th data-col="total_open">ค้างแก้</th>
+              <th data-col="delta" id="th-delta" title="เปลี่ยนแปลงจาก refresh ล่าสุด">Δ</th>
+              <th data-col="median_days">Median วัน</th>
+              <th data-col="repeat_clusters">ซ้ำซาก</th>
+              <th data-col="debt_score" class="sort-desc">Debt Score</th>
+              <th data-col="compound_risk_6l" title="6-layer compound risk (0–10) จาก Traffy+น้ำท่วม+วิน+AQI+ความร้อน · Ranked 50 เขต">⚡6L Risk</th>
+              <th style="width:22px;cursor:default">🔗</th>
+            </tr>
+          </thead>
+          <tbody id="screener-body">
+            <tr><td colspan="6" style="text-align:center;color:var(--muted);padding:24px;">กำลังโหลด…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    <!-- SEASONAL FORECAST PANEL -->
+    <div id="seasonal">
+      <h4>🌧️ คาดการณ์ตามฤดูกาล <span style="font-weight:400;color:var(--muted);font-size:0.65rem">(สถิติ 5 ปี · ไม่ใช่ LLM)</span></h4>
+      <div class="seas-note">ปริมาณร้องเรียนเทียบ baseline (ก.พ.) · rainy season มิ.ย.–ต.ค.</div>
+      <div class="seas-bars" id="seas-bars"></div>
+      <div class="seas-label" id="seas-labels"></div>
+      <div class="seas-curr-line" id="seas-curr"></div>
+    </div>
+    <!-- ROUTE RISK -->
+    <div id="route-risk-wrap">
+      <h4>🗺️ Route Risk — เช็กความเสี่ยงตลอดเส้นทาง</h4>
+      <div class="rr-form">
+        <select id="rr-from" class="rr-sel"><option value="">จากเขต…</option></select>
+        <span style="color:var(--muted)">→</span>
+        <select id="rr-to" class="rr-sel"><option value="">ถึงเขต…</option></select>
+        <button class="rr-btn" onclick="calcRouteRisk()">คำนวณ</button>
+      </div>
+      <div class="rr-result" id="rr-result"></div>
+    </div>
+    </div><!-- /screener -->
+
+    <!-- DIGEST PANEL (hidden by default) -->
+    <div id="digest-panel">
+      <div id="digest-hdr">
+        <h3>📰 สรุปรายสัปดาห์</h3>
+        <p>Typhoon ThaiLLM วิเคราะห์ District Debt · รันทุกวันจันทร์ 02:00 BKK</p>
+      </div>
+      <div id="digest-body">
+        <div class="digest-unavail"><div class="du-icon">📰</div>กำลังโหลด…</div>
+      </div>
+    </div>
+
+    <div id="input-row">
+      <input id="inp" type="text" placeholder="พิมพ์คำถาม แล้วกด Enter…"/>
+      <button id="send" onclick="ask()">ส่ง →</button>
+    </div>
+  </div>
+
+  <!-- MAP SECTION -->
+  <div id="mapsec">
+    <div id="maptb">
+      <label>เขต</label>
+      <select id="sel-d"><option value="">ทุกเขต</option></select>
+      <label>ประเภท</label>
+      <select id="sel-t">
+        <option value="">ทั้งหมด</option>
+        <option value="ถนน">ถนน/สะพาน</option>
+        <option value="ทางเท้า">ทางเท้า</option>
+      </select>
+      <button class="tbtn" onclick="applyFilters()">กรอง</button>
+      <button class="tbtn ghost" id="aqi-btn" onclick="toggleAqi()">🌬️ PM2.5 OFF</button>
+      <button class="tbtn ghost" onclick="window.open(API+'/api/traffy/export.csv')" title="ดาวน์โหลด CSV">⬇ CSV</button>
+      <button class="tbtn ghost" id="route-clear-btn" onclick="clearRoute()" style="display:none;border-color:#fc8181;color:#fc8181">✕ ล้างเส้นทาง</button>
+      <span id="cnt">กำลังโหลด…</span>
+    </div>
+
+    <div id="map"></div>
+    <div id="map-loading">
+      <div class="load-spinner"></div>
+      <span>กำลังโหลด Traffy Fondue…</span>
+    </div>
+
+    <!-- AQI Legend -->
+    <div id="aqi-leg">
+      <h4>🌬️ PM2.5 ระดับ</h4>
+      <div class="al"><div class="ad" style="background:#4ade80"></div><span>ดีมาก ≤25</span></div>
+      <div class="al"><div class="ad" style="background:#facc15"></div><span>ดี 26–37</span></div>
+      <div class="al"><div class="ad" style="background:#fb923c"></div><span>ปานกลาง 38–50</span></div>
+      <div class="al"><div class="ad" style="background:#f87171"></div><span>มีผลสุขภาพ 51–90</span></div>
+      <div class="al"><div class="ad" style="background:#c084fc"></div><span>อันตราย 91+</span></div>
+    </div>
+
+    <!-- Traffy Legend -->
+    <div id="traffy-leg">
+      <div class="tl"><div class="td" style="background:#f1c40f"></div><span>ถนน/สะพาน</span></div>
+      <div class="tl"><div class="td" style="background:#e67e22"></div><span>ทางเท้า</span></div>
+      <div class="tl"><div class="td" style="background:#c0392b"></div><span>ปัญหาซ้ำซาก</span></div>
+    </div>
+
+    <!-- Insight bar -->
+    <div id="ins-bar">
+      <div class="ins-dot"></div>
+      <span id="ins-txt">กำลังโหลดข้อมูล…</span>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<!-- Mobile tabs -->
+<div id="m-tabs">
+  <button class="mt-btn" id="t-chat" onclick="switchTab('chat')">💬 AI Chat</button>
+  <button class="mt-btn on" id="t-map" onclick="switchTab('map')">🗺️ แผนที่</button>
+</div>
+
+<script>
+/* ═══════════ CONFIG ═══════════ */
+// Relative paths when served from EC2; absolute fallback for GitHub Pages
+const API = (window.location.port === '8001' || window.location.hostname === 'localhost')
+  ? '' : 'http://18.138.102.113:8001';
+
+/* ═══════════ MAP INIT ═══════════ */
+const map = L.map('map', { center:[13.754,100.502], zoom:11 });
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+  attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+  maxZoom:19
+}).addTo(map);
+
+const cluster = L.markerClusterGroup({ maxClusterRadius:45, spiderfyOnMaxZoom:true });
+map.addLayer(cluster);
+const aqiLayer = L.layerGroup();
+let aqiVisible = false;
+let routeLayer = null;
+let allMkrs = [], filtMkrs = [];
+let insightMsgs = [], insI = 0;
+
+/* ═══════════ LOAD TRAFFY ═══════════ */
+(async()=>{
+  const overlay = document.getElementById('map-loading');
+  try {
+    setIns('กำลังโหลดข้อมูล Traffy Fondue…');
+    const r = await fetch(API + '/api/traffy/geojson');
+    if(!r.ok) throw new Error(r.status);
+    const gj = await r.json();
+    renderGeoJSON(gj);
+  } catch(e) {
+    console.warn('traffy/geojson failed:', e);
+    setIns('ไม่สามารถโหลด Traffy data ได้ · ใช้ Journey AI Chat ถามข้อมูลได้เลย');
+    document.getElementById('cnt').textContent = 'API mode';
+  } finally {
+    overlay.classList.add('hidden');
+  }
+})();
+
+function renderGeoJSON(gj) {
+  const features = gj.features || [];
+  const dists = new Set();
+  cluster.clearLayers();
+  allMkrs = [];
+
+  features.forEach(f => {
+    const p = f.properties || {};
+    const c = f.geometry?.coordinates;
+    if (!c) return;
+    const [lon, lat] = c;
+    if (!lat || !lon || isNaN(lat) || isNaN(lon)) return;
+    if (p.district) dists.add(p.district);
+
+    const isR = !!p.is_repeat;
+    const col = isR ? '#c0392b' : (String(p.cg||'').includes('ทางเท้า') ? '#e67e22' : '#f1c40f');
+    const radius = isR ? 7 : 5;
+
+    const mk = L.circleMarker([lat,lon], {
+      radius, color:col, fillColor:col, fillOpacity:.7, weight:1.2,
+      _d: p.district||'', _t: String(p.cg||''), _r: isR
+    });
+    mk.bindPopup(`<div class="pc">
+      <div class="ph">${esc(p.cg||'ไม่ระบุ')}${isR?'<span class="rb">ซ้ำซาก</span>':''}</div>
+      <div class="ps">📍 ${esc(p.district||'')} ${esc(p.subdistrict||'')}</div>
+      <div class="ps">⏳ ค้างแก้ ${Math.round(p.days||0)} วัน</div>
+      <div class="pd">${esc(p.address||'').slice(0,80)}</div>
+    </div>`);
+
+    allMkrs.push(mk);
+    cluster.addLayer(mk);
+  });
+
+  filtMkrs = allMkrs;
+  populateDist([...dists].sort());
+  updateCnt(allMkrs.length);
+  buildInsights();
+}
+
+function populateDist(dists) {
+  const sel = document.getElementById('sel-d');
+  dists.forEach(d => {
+    const o = document.createElement('option');
+    o.value = d; o.textContent = d;
+    sel.appendChild(o);
+  });
+}
+
+function applyFilters() {
+  const dv = document.getElementById('sel-d').value;
+  const tv = document.getElementById('sel-t').value;
+  cluster.clearLayers();
+  filtMkrs = allMkrs.filter(m => {
+    const distOk = !dv || m.options._d === dv;
+    const typeOk = !tv || m.options._t.includes(tv);
+    return distOk && typeOk;
+  });
+  filtMkrs.forEach(m => cluster.addLayer(m));
+  updateCnt(filtMkrs.length);
+  if (dv && filtMkrs.length) {
+    const ll = filtMkrs[0].getLatLng();
+    map.setView([ll.lat, ll.lng], 13);
+  }
+}
+
+function updateCnt(n) {
+  document.getElementById('cnt').innerHTML = `แสดง <b>${n.toLocaleString()}</b> รายการ`;
+}
+
+function buildInsights() {
+  const dc = {};
+  let repeatCount = 0;
+  allMkrs.forEach(m => {
+    const d = m.options._d;
+    if(d) dc[d] = (dc[d]||0)+1;
+    if(m.options._r) repeatCount++;
+  });
+  const top = Object.entries(dc).sort((a,b)=>b[1]-a[1]);
+  if (top.length) {
+    document.getElementById('h-top').textContent = top[0][0];
+  }
+
+  const live = allMkrs.length.toLocaleString();
+  const rpt  = repeatCount.toLocaleString();
+
+  insightMsgs = [
+    `รายงานค้างแก้ (live) ${live} รายการ · ซ้ำซาก ${rpt} จุด`,
+    'สถิติย้อนหลัง 5 ปี · 361,438 รายการ · อัตราปิดลดจาก 91% → 58%',
+    'สถิติย้อนหลัง 5 ปี · ปริมาณร้องเรียนพุ่ง 2.3× ในช่วงฤดูฝน',
+    top.length ? `เขตที่มีรายงานค้างมากสุด: ${top[0][0]} (${top[0][1].toLocaleString()} รายการ)` : '',
+  ].filter(Boolean);
+
+  setIns(insightMsgs[0]);
+  setInterval(() => {
+    insI = (insI+1) % insightMsgs.length;
+    setIns(insightMsgs[insI]);
+  }, 5000);
+}
+
+function setIns(t) { document.getElementById('ins-txt').textContent = t; }
+
+async function loadStatus() {
+  try {
+    const r = await fetch(API + '/api/traffy/status');
+    if (!r.ok) return;
+    const s = await r.json();
+    const cnt = s.open_tickets;
+    if (cnt) {
+      const fmt = cnt.toLocaleString();
+      document.getElementById('h-tickets').textContent = fmt;
+      const gc = document.getElementById('greeting-count');
+      if (gc) gc.textContent = `Traffy Fondue ${fmt} รายการ`;
+    }
+  } catch(e) { /* silent — header stays as loaded count from GeoJSON */ }
+}
+loadStatus();
+
+/* ═══════════ PANEL SWITCHING ═══════════ */
+let screenerLoaded = false;
+let digestLoaded   = false;
+let screenerData = [];
+let screenerHasDelta = false;
+let sortCol = 'debt_score';
+let sortDir = -1; // -1 = desc
+
+function switchPanel(panel) {
+  const chatHdr  = document.getElementById('chat-hdr');
+  const msgs     = document.getElementById('msgs');
+  const chips    = document.getElementById('chips-wrap');
+  const inputRow = document.getElementById('input-row');
+  const screener = document.getElementById('screener');
+  const digest   = document.getElementById('digest-panel');
+
+  const isChat     = panel === 'chat';
+  const isScreener = panel === 'screener';
+  const isDigest   = panel === 'digest';
+
+  chatHdr.style.display  = isChat ? '' : 'none';
+  msgs.style.display     = isChat ? '' : 'none';
+  if (chips) chips.style.display = isChat ? '' : 'none';
+  inputRow.style.display = isChat ? '' : 'none';
+  screener.style.display = isScreener ? 'flex' : 'none';
+  if (digest) digest.style.display = isDigest ? 'flex' : 'none';
+
+  document.getElementById('ptab-chat').classList.toggle('on', isChat);
+  document.getElementById('ptab-screener').classList.toggle('on', isScreener);
+  document.getElementById('ptab-digest').classList.toggle('on', isDigest);
+
+  if (isScreener && !screenerLoaded) {
+    loadClusters();
+    loadSeasonal();
+    screenerLoaded = true;
+  }
+  if (isDigest && !digestLoaded) {
+    loadDigest();
+    digestLoaded = true;
+  }
+}
+
+/* ═══════════ DEBT SCREENER ═══════════ */
+async function loadClusters() {
+  try {
+    const r = await fetch(API + '/api/clusters');
+    if (!r.ok) throw new Error(r.status);
+    const d = await r.json();
+    screenerData     = d.districts || [];
+    screenerHasDelta = !!d.has_delta;
+    const thDelta = document.getElementById('th-delta');
+    if (thDelta) thDelta.style.display = screenerHasDelta ? '' : 'none';
+    renderScreener();
+    populateRouteRiskSelects(screenerData);
+    // Handle ?district= URL param
+    if (window._urlDistrict) {
+      const target = window._urlDistrict;
+      window._urlDistrict = null;
+      setTimeout(() => scrollToDistrict(target), 150);
+    }
+  } catch(e) {
+    document.getElementById('screener-body').innerHTML =
+      '<tr><td colspan="10" style="text-align:center;color:var(--red);padding:24px;">โหลดข้อมูลไม่สำเร็จ — ตรวจว่า backend รันอยู่</td></tr>';
+  }
+}
+
+let expandedDistrict = null;
+
+function renderScreener() {
+  const wl     = getWatchlist();
+  const sorted = [...screenerData].sort((a, b) => {
+    const av = a[sortCol] ?? -Infinity;
+    const bv = b[sortCol] ?? -Infinity;
+    return sortDir * (bv - av);
+  });
+  const maxDebt = sorted.length ? sorted[0].debt_score : 1;
+
+  const tbody = document.getElementById('screener-body');
+  const rows = [];
+  sorted.forEach((d, i) => {
+    const rank    = i + 1;
+    const cls     = rank === 1 ? 'gold' : rank === 2 ? 'silver' : rank === 3 ? 'bronze' : '';
+    const pct     = maxDebt > 0 ? Math.round((d.debt_score / maxDebt) * 80) : 0;
+    const pinned  = wl.has(d.district);
+    const trendOn = expandedDistrict === d.district;
+    let deltaCell = '';
+    if (screenerHasDelta) {
+      const dv = d.delta || 0;
+      if      (dv > 0) deltaCell = `<span class="delta-up">+${dv}</span>`;
+      else if (dv < 0) deltaCell = `<span class="delta-dn">${dv}</span>`;
+      else             deltaCell = `<span class="delta-nc">—</span>`;
+    }
+    rows.push(`<tr onclick="highlightDistrict('${esc(d.district)}')" style="cursor:pointer">
+      <td onclick="event.stopPropagation();toggleWatch('${esc(d.district)}')" style="cursor:pointer;text-align:center;">
+        <button class="pin-btn${pinned?' pinned':''}" title="${pinned?'เลิกติดตาม':'ติดตามเขตนี้'}">📌</button>
+      </td>
+      <td><span class="rank-badge ${cls}">${rank}</span></td>
+      <td style="font-weight:600;color:var(--text)">
+        ${esc(d.district)}
+        <button class="trend-btn${trendOn?' on':''}" onclick="event.stopPropagation();toggleTrend('${esc(d.district)}')" title="ดูแนวโน้มรายเดือน">📈</button>
+      </td>
+      <td style="color:var(--muted)">${d.total_open.toLocaleString()}</td>
+      ${screenerHasDelta ? `<td>${deltaCell}</td>` : ''}
+      <td style="color:var(--muted)">${d.median_days}</td>
+      <td style="color:#fc8181">${d.repeat_clusters}</td>
+      <td><div class="debt-bar">
+        <span class="debt-num">${d.debt_score}</span>
+        <div class="debt-fill" style="width:${pct}px"></div>
+      </div></td>
+      <td style="text-align:center;">${
+        d.compound_risk_6l != null
+          ? `<span style="font-weight:700;color:${
+              d.compound_risk_6l>=8?'#c084fc':d.compound_risk_6l>=6?'#fc8181':d.compound_risk_6l>=4?'#F6AD55':'#48bb78'
+            };font-size:.85rem">${d.compound_risk_6l}</span><span style="font-size:.6rem;color:var(--muted)"> /10</span>`
+          : '<span style="color:var(--muted);font-size:.7rem">—</span>'
+      }</td>
+      <td onclick="event.stopPropagation();shareDistrict('${esc(d.district)}')" style="cursor:pointer;text-align:center;">
+        <button class="share-btn" title="คัดลอกลิงก์เขตนี้">🔗</button>
+      </td>
+    </tr>`);
+    if (trendOn) {
+      rows.push(`<tr class="trend-row"><td colspan="11">
+        <div class="trend-wrap" id="trend-${esc(d.district)}">
+          <span style="font-size:.72rem;color:var(--muted)">⏳ กำลังโหลดแนวโน้ม…</span>
+        </div></td></tr>`);
+    }
+  });
+  tbody.innerHTML = rows.join('');
+
+  document.querySelectorAll('#screener-tbl th').forEach(th => {
+    th.classList.remove('sort-asc','sort-desc');
+    if (th.dataset.col === sortCol) {
+      th.classList.add(sortDir === -1 ? 'sort-desc' : 'sort-asc');
+    }
+  });
+
+  renderWatchlistAlert();
+
+  // Load trend data if a district is expanded
+  if (expandedDistrict) fetchTrend(expandedDistrict);
+}
+
+/* ═══════════ SEASONAL FORECAST ═══════════ */
+async function loadSeasonal() {
+  try {
+    const r = await fetch(API + '/api/seasonal');
+    if (!r.ok) return;
+    renderSeasonal(await r.json());
+  } catch(e) { /* silent */ }
+}
+
+function renderSeasonal(d) {
+  const forecast = d.forecast || [];
+  const maxF = 2.30;
+  const H    = 44; // px height of bar area
+
+  const barsEl   = document.getElementById('seas-bars');
+  const labelsEl = document.getElementById('seas-labels');
+  const currEl   = document.getElementById('seas-curr');
+  if (!barsEl) return;
+
+  barsEl.innerHTML = forecast.map(m => {
+    const h   = Math.round((m.factor / maxF) * H);
+    const col = m.is_current ? 'var(--amber)' : m.is_rainy ? '#fc818166' : 'var(--border)';
+    const brd = m.is_current ? '2px solid var(--amber)' : 'none';
+    return `<div class="seas-bar" style="height:${h}px;background:${col};border:${brd}" title="${m.month_th} ×${m.factor}"></div>`;
+  }).join('');
+
+  labelsEl.innerHTML = forecast.map(m =>
+    `<span class="seas-lbl${m.is_current?' curr':''}">${m.month_th}</span>`
+  ).join('');
+
+  const isRainy = d.forecast.find(m => m.month === d.current_month)?.is_rainy;
+  const rainLabel = isRainy ? '☔ ช่วงฤดูฝน' : '☀️ ช่วงแล้ง';
+  currEl.innerHTML = `<span class="seas-factor">${d.current_factor}×</span>
+    <span>${d.current_month_th} ${rainLabel} · คาดพุ่งถึง <b style="color:var(--amber)">${d.peak_factor}× (${d.peak_month_th})</b></span>`;
+}
+
+function highlightDistrict(district) {
+  document.getElementById('sel-d').value = district;
+  applyFilters();
+  switchPanel('chat');
+  if (window.innerWidth > 768) switchTab('map');
+}
+
+// Wire table header clicks (script is at bottom of body — DOM is ready)
+document.querySelectorAll('#screener-tbl th[data-col]').forEach(th => {
+  th.addEventListener('click', () => {
+    const col = th.dataset.col;
+    if (col === 'rank' || col === 'district') return;
+    if (sortCol === col) { sortDir *= -1; }
+    else { sortCol = col; sortDir = -1; }
+    renderScreener();
+  });
+});
+
+/* ═══════════ AQI OVERLAY ═══════════ */
+const AQI_C = {'1':'#4ade80','2':'#facc15','3':'#fb923c','4':'#f87171','5':'#c084fc','6':'#7c3aed'};
+
+async function loadAqi() {
+  try {
+    const r = await fetch(API + '/api/aqi');
+    if(!r.ok) throw new Error(r.status);
+    const data = await r.json();
+    const stations = data.stations || [];
+
+    // Header stat
+    const wd = stations.filter(s => s.pm25_ugm3 > 0);
+    if (wd.length) {
+      const avg = wd.reduce((a,s)=>a+s.pm25_ugm3,0)/wd.length;
+      document.getElementById('h-aqi').textContent = `${avg.toFixed(1)} µg/m³`;
+    }
+
+    // Build circles
+    aqiLayer.clearLayers();
+    stations.forEach(s => {
+      if (!s.lat || !s.lon) return;
+      const col = AQI_C[s.color_id] || '#888';
+      const c = L.circleMarker([s.lat,s.lon],{radius:14,color:col,fillColor:col,fillOpacity:.5,weight:2});
+      c.bindPopup(`<div class="pc">
+        <div class="ph">🌬️ ${esc(s.name_th)}</div>
+        <div class="ps">PM2.5: <b>${s.pm25_ugm3} µg/m³</b> (AQI: ${s.pm25_aqi})</div>
+        <div class="ps">📍 ${esc(s.district)}</div>
+        <div class="pd">อัปเดต: ${s.timestamp}</div>
+      </div>`);
+      aqiLayer.addLayer(c);
+    });
+  } catch(e) {
+    console.warn('AQI load fail:', e.message);
+    document.getElementById('h-aqi').textContent = 'ไม่พบข้อมูล';
+  }
+}
+
+function toggleAqi() {
+  aqiVisible = !aqiVisible;
+  const btn = document.getElementById('aqi-btn');
+  const leg = document.getElementById('aqi-leg');
+  if (aqiVisible) {
+    map.addLayer(aqiLayer);
+    btn.textContent = '🌬️ PM2.5 ON';
+    btn.classList.add('on');
+    leg.classList.add('show');
+  } else {
+    map.removeLayer(aqiLayer);
+    btn.textContent = '🌬️ PM2.5 OFF';
+    btn.classList.remove('on');
+    leg.classList.remove('show');
+  }
+}
+
+loadAqi();
+setInterval(loadAqi, 600_000);
+
+/* ═══════════ AI CHAT ═══════════ */
+let busy = false;
+const msgsEl = document.getElementById('msgs');
+
+function q(text) {
+  document.getElementById('inp').value = text;
+  ask();
+}
+
+async function ask() {
+  if (busy) return;
+  const inp = document.getElementById('inp');
+  const query = inp.value.trim();
+  if (!query) return;
+
+  if (window.innerWidth <= 768) switchTab('chat');
+
+  addMsg('user', query);
+  inp.value = '';
+  busy = true;
+  document.getElementById('send').disabled = true;
+
+  // Hide chips after first question
+  const cw = document.getElementById('chips-wrap');
+  if (cw) cw.style.display = 'none';
+
+  // Typing indicator
+  const typ = document.createElement('div');
+  typ.className = 'typing';
+  typ.innerHTML = '<div class="dots"><span></span><span></span><span></span></div>';
+  msgsEl.appendChild(typ);
+  msgsEl.scrollTop = msgsEl.scrollHeight;
+
+  try {
+    const r = await fetch(API + '/api/journey-query', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({query}),
+    });
+    typ.remove();
+
+    if (!r.ok) {
+      const err = await r.json().catch(()=>({}));
+      addMsg('bot', `⚠️ ระบบขัดข้อง: ${err.detail || r.statusText}`, null);
+      return;
+    }
+
+    const d = await r.json();
+    const tags = [];
+    if (d.district_detected && d.district_detected !== 'ไม่ระบุเขต') tags.push(`📍 ${d.district_detected}`);
+    if (d.pm25_ugm3 != null) tags.push(`🌬️ PM2.5: ${d.pm25_ugm3.toFixed(1)} µg/m³`);
+    if (d.weather?.temp_c) tags.push(`🌡️ ${d.weather.temp_c}°C ความชื้น${d.weather.humidity}%`);
+    if (d.weather?.rain_risk && d.weather.rain_risk !== 'ต่ำ (ไม่มีฝนหรือฝนเล็กน้อย)') tags.push(`🌧️ ฝน: ${d.weather.rain_risk}`);
+    if (d.open_tickets_count > 0) tags.push(`🚧 ${d.open_tickets_count.toLocaleString()} รายการค้างแก้`);
+    if (d.top_streets?.length) tags.push(`ถ.ที่มีปัญหา: ${d.top_streets.slice(0,2).join(', ')}`);
+    (d.sources||[]).forEach(s => tags.push(s));
+
+    addMsg('bot', d.answer, tags, d.reasoning, d.compound_risk || null);
+
+    // Highlight district on map
+    if (d.district_detected && d.district_detected !== 'ไม่ระบุเขต') {
+      document.getElementById('sel-d').value = d.district_detected;
+      applyFilters();
+      if (window.innerWidth > 768) switchTab('map');
+    }
+  } catch(e) {
+    typ.remove();
+    addMsg('bot', `⚠️ ไม่สามารถเชื่อมต่อ API ได้\n\nตรวจสอบว่า backend รันอยู่ที่ ${API||'http://localhost:8001'}`);
+  } finally {
+    busy = false;
+    document.getElementById('send').disabled = false;
+  }
+}
+
+function addMsg(role, text, tags, reasoning, risk) {
+  const div = document.createElement('div');
+  div.className = `msg ${role}`;
+  if (role === 'bot') {
+    let inner = '';
+    if (risk) {
+      const c  = risk.color;
+      const cp = risk.components;
+      inner += `<div class="risk-badge" style="background:${c}18;border:1px solid ${c}50;">
+        <span class="risk-score" style="color:${c}">${risk.score}</span>
+        <div>
+          <div class="risk-meta-level" style="color:${c}">Compound Risk · ${risk.level}</div>
+          <div class="risk-meta-comp">Real-time overlay: AQI ${cp.aqi} · ถนน ${cp.traffy} · ฝน ${cp.weather} (จาก 10)</div>
+          <div class="risk-meta-comp" style="margin-top:2px;font-style:italic">engine = 6-layer baseline × real-time</div>
+        </div>
+      </div>`;
+    }
+    inner += esc(text).replace(/\n/g,'<br>');
+    if (tags?.length) {
+      inner += `<div class="meta">${tags.map(t=>`<span class="mt">${esc(t)}</span>`).join('')}</div>`;
+    }
+    if (reasoning) {
+      const rid = 'r' + Date.now();
+      inner += `<div class="reasoning-wrap">
+        <button class="reasoning-toggle" onclick="toggleReasoning('${rid}')">🧠 ดูเหตุผล AI</button>
+        <div class="reasoning-body" id="${rid}">${esc(reasoning).replace(/\n/g,'<br>')}</div>
+      </div>`;
+    }
+    div.innerHTML = inner;
+  } else {
+    div.textContent = text;
+  }
+  msgsEl.appendChild(div);
+  msgsEl.scrollTop = msgsEl.scrollHeight;
+}
+
+function toggleReasoning(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.classList.toggle('open');
+  const btn = el.previousElementSibling;
+  btn.textContent = el.classList.contains('open') ? '🧠 ซ่อนเหตุผล AI' : '🧠 ดูเหตุผล AI';
+}
+
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+document.getElementById('inp').addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.preventDefault(); ask(); }
+});
+
+/* ═══════════ WATCHLIST (S2) ═══════════ */
+const WL_KEY = 'bji_watchlist';
+
+function getWatchlist() {
+  try { return new Set(JSON.parse(localStorage.getItem(WL_KEY) || '[]')); }
+  catch { return new Set(); }
+}
+function saveWatchlist(set) {
+  localStorage.setItem(WL_KEY, JSON.stringify([...set]));
+}
+function toggleWatch(district) {
+  const wl = getWatchlist();
+  if (wl.has(district)) wl.delete(district); else wl.add(district);
+  saveWatchlist(wl);
+  renderScreener();
+}
+function clearWatchlist() {
+  localStorage.removeItem(WL_KEY);
+  renderScreener();
+}
+
+/* ═══════════ WEEKLY DIGEST (S4) ═══════════ */
+async function loadDigest() {
+  const body = document.getElementById('digest-body');
+  try {
+    const r = await fetch(API + '/api/digest');
+    if (!r.ok) throw new Error(r.status);
+    const d = await r.json();
+
+    if (!d.available) {
+      body.innerHTML = `<div class="digest-unavail">
+        <div class="du-icon">📅</div>
+        <div style="font-size:0.82rem;margin-bottom:6px;color:var(--text)">ยังไม่มีรายงาน</div>
+        <div style="font-size:0.72rem">Typhoon จะสรุปทุกวันจันทร์ 02:00 BKK</div>
+        <div style="font-size:0.65rem;margin-top:10px;color:#4a6080">cron: <span style="color:var(--amber)">0 19 * * 0</span> (Sun 19:00 UTC)</div>
+      </div>`;
+      return;
+    }
+
+    const genDate = (() => {
+      try {
+        return new Date(d.generated_at).toLocaleString('th-TH', {
+          timeZone:'Asia/Bangkok', year:'numeric', month:'short',
+          day:'numeric', hour:'2-digit', minute:'2-digit'
+        });
+      } catch { return d.generated_at || ''; }
+    })();
+
+    const topRows = (d.top_districts || []).slice(0, 8).map((dt, i) => {
+      const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : (i+1);
+      return `<tr>
+        <td style="text-align:center">${medal}</td>
+        <td style="font-weight:600;color:var(--text)">${esc(dt.district)}</td>
+        <td style="color:var(--muted)">${(dt.total_open||0).toLocaleString()}</td>
+        <td style="color:#fc8181">${dt.repeat_clusters||0}</td>
+        <td><span style="color:var(--amber);font-weight:700">${dt.debt_score||0}</span></td>
+      </tr>`;
+    }).join('');
+
+    body.innerHTML = `
+      <div class="digest-gen">อัปเดต: ${genDate} · รวม ${(d.total_open||0).toLocaleString()} รายการค้างแก้</div>
+      <div class="digest-text">${esc(d.digest || '(ไม่มีข้อความ)')}</div>
+      <div style="font-size:0.75rem;font-weight:700;color:var(--amber);margin:14px 0 6px">
+        Top ${(d.top_districts||[]).length} เขต — District Debt Score
+      </div>
+      <table class="digest-mini-tbl">
+        <thead><tr>
+          <th style="width:30px">#</th>
+          <th>เขต</th><th>ค้างแก้</th><th>ซ้ำซาก</th><th>Debt Score</th>
+        </tr></thead>
+        <tbody>${topRows}</tbody>
+      </table>
+      <div style="font-size:0.63rem;color:var(--muted);margin-top:14px;line-height:1.6">
+        debt score = ซ้ำซาก × log(median วัน) · สรุปโดย Typhoon ThaiLLM<br>
+        ห้ามอ้างว่า "ลดอุบัติเหตุ" — ใช้ข้อมูล "รายงานค้างแก้" จาก Traffy Fondue เท่านั้น
+      </div>`;
+  } catch(e) {
+    body.innerHTML = `<div class="digest-unavail">
+      <div class="du-icon">⚠️</div>
+      <div style="font-size:0.82rem;color:var(--text)">โหลดไม่สำเร็จ</div>
+      <div style="font-size:0.7rem">ตรวจสอบว่า backend รันอยู่</div>
+    </div>`;
+  }
+}
+
+function renderWatchlistAlert() {
+  const banner = document.getElementById('wl-banner');
+  const badge  = document.getElementById('wl-badge');
+  if (!banner) return;
+
+  const wl = getWatchlist();
+
+  // Update tab badge
+  if (badge) {
+    const alertCount = screenerHasDelta
+      ? screenerData.filter(d => wl.has(d.district) && (d.delta||0) !== 0).length
+      : 0;
+    badge.textContent = alertCount > 0 ? alertCount : (wl.size > 0 ? wl.size : '');
+    badge.style.background = alertCount > 0 ? '#fc8181' : 'rgba(246,173,85,.6)';
+  }
+
+  if (!wl.size) { banner.classList.remove('show'); return; }
+
+  const items = [...wl].map(name => {
+    const row = screenerData.find(d => d.district === name);
+    if (!row) return null;
+    const dv  = screenerHasDelta ? (row.delta || 0) : null;
+    const col = dv > 0 ? '#fc8181' : dv < 0 ? '#48bb78' : 'var(--amber)';
+    const lbl = (dv !== null && dv !== 0) ? ` ${dv > 0 ? '+' : ''}${dv}` : '';
+    return `<span class="wl-tag" onclick="highlightDistrict('${esc(name)}')"
+      style="border-color:${col};color:${col}">${esc(name)}${lbl}</span>`;
+  }).filter(Boolean);
+
+  if (!items.length) { banner.classList.remove('show'); return; }
+
+  const alertCount = screenerHasDelta
+    ? screenerData.filter(d => wl.has(d.district) && (d.delta||0) !== 0).length
+    : 0;
+  const hdr = alertCount > 0
+    ? `<span style="color:var(--amber);font-weight:700">📌 เขตที่ติดตาม · <span style="color:#fc8181">${alertCount} เขตมีการเปลี่ยนแปลง</span></span>`
+    : `<span style="color:var(--amber);font-weight:700">📌 เขตที่ติดตาม (${items.length})</span>`;
+
+  banner.innerHTML = `${hdr}${items.join('')}<button class="wl-clear" onclick="clearWatchlist()">ล้างทั้งหมด</button>`;
+  banner.classList.add('show');
+}
+
+/* ═══════════ TREND SPARKLINE ═══════════ */
+function toggleTrend(district) {
+  expandedDistrict = (expandedDistrict === district) ? null : district;
+  renderScreener();
+}
+
+async function fetchTrend(district) {
+  const wrap = document.getElementById('trend-' + district);
+  if (!wrap) return;
+  try {
+    const r = await fetch(API + '/api/district/trend?district=' + encodeURIComponent(district));
+    if (!r.ok) throw new Error(r.status);
+    wrap.innerHTML = buildSparkline(await r.json());
+  } catch(e) {
+    if (wrap) wrap.innerHTML = '<span style="font-size:.72rem;color:var(--red)">โหลดไม่สำเร็จ</span>';
+  }
+}
+
+function buildSparkline(data) {
+  const older  = data.older_count || 0;
+  const months = data.months || [];
+  const total  = data.total || 0;
+  if (!months.length) return '<div style="color:var(--muted);font-size:.75rem">ไม่มีข้อมูล timestamp</div>';
+
+  // 13 bars: "เก่ากว่า" + last 12 months
+  const all = [{ label: 'เก่ากว่า', count: older, old: true }, ...months];
+  const max = Math.max(...all.map(m => m.count), 1);
+  const W = 270, H = 38;
+  const barW = Math.floor((W - all.length) / all.length);
+  const nowKey = (() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+  })();
+
+  const bars = all.map((m, i) => {
+    const h   = Math.max(Math.round((m.count / max) * H), m.count > 0 ? 2 : 0);
+    const x   = i * (barW + 1);
+    const y   = H - h;
+    const col = m.old ? 'rgba(252,129,129,.55)' : (m.key === nowKey ? 'var(--amber)' : 'rgba(246,173,85,.38)');
+    return `<rect x="${x}" y="${y}" width="${barW}" height="${h}" fill="${col}" rx="1"/>
+            <title>${m.label}: ${m.count} รายการ</title>`;
+  }).join('');
+
+  // Show label every 3 months + first "older" label
+  const labelHtml = all.map((m, i) => {
+    if (i !== 0 && i % 3 !== 1) return '';
+    const xPct = ((i * (barW + 1) + barW / 2) / W * 100).toFixed(1);
+    const col  = m.key === nowKey ? 'var(--amber)' : (m.old ? '#fc8181' : 'var(--muted)');
+    return `<span style="position:absolute;left:${xPct}%;transform:translateX(-50%);color:${col}">${m.label}</span>`;
+  }).join('');
+
+  return `
+    <div style="font-size:.64rem;color:var(--muted);margin-bottom:5px">
+      เดือนที่รายงาน (ยังค้างแก้) · เขต<b style="color:var(--text)">${esc(data.district)}</b>
+      · รวม <b style="color:var(--amber)">${total.toLocaleString()}</b> รายการ
+      ${older > 0 ? `· <span style="color:#fc8181">เก่ากว่า 12 เดือน: ${older.toLocaleString()} รายการ</span>` : ''}
+    </div>
+    <svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" style="display:block">${bars}</svg>
+    <div style="position:relative;height:15px;font-size:.54rem;margin-top:2px">${labelHtml}</div>`;
+}
+
+/* ═══════════ ROUTE RISK ═══════════ */
+function populateRouteRiskSelects(districts) {
+  ['rr-from', 'rr-to'].forEach((id, idx) => {
+    const sel = document.getElementById(id);
+    if (!sel) return;
+    const placeholder = idx === 0 ? 'จากเขต…' : 'ถึงเขต…';
+    sel.innerHTML = `<option value="">${placeholder}</option>`;
+    districts.forEach(d => {
+      const o = document.createElement('option');
+      o.value = d.district; o.textContent = d.district;
+      sel.appendChild(o);
+    });
+  });
+}
+
+async function calcRouteRisk() {
+  const from   = document.getElementById('rr-from').value;
+  const to     = document.getElementById('rr-to').value;
+  const result = document.getElementById('rr-result');
+  if (!from || !to) {
+    result.innerHTML = '<div style="color:var(--red);font-size:.74rem;margin-top:4px">⚠ กรุณาเลือกทั้งต้นทางและปลายทาง</div>';
+    return;
+  }
+  if (from === to) {
+    result.innerHTML = '<div style="color:var(--muted);font-size:.74rem;margin-top:4px">เลือกเขตที่ต่างกัน</div>';
+    return;
+  }
+  result.innerHTML = '<div style="font-size:.74rem;color:var(--muted);margin-top:4px">⏳ กำลังคำนวณ…</div>';
+  try {
+    const r = await fetch(`${API}/api/route-risk?from_district=${encodeURIComponent(from)}&to_district=${encodeURIComponent(to)}`);
+    if (!r.ok) throw new Error((await r.json().catch(()=>({}))).detail || r.statusText);
+    const d    = await r.json();
+    const risk = d.compound_risk;
+    const c    = risk.color;
+    result.innerHTML = `
+      <div style="background:${c}18;border:1px solid ${c}50;border-radius:8px;padding:8px 12px;margin-top:6px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="font-size:1.5rem;font-weight:800;color:${c};line-height:1">${risk.score}</span>
+          <div>
+            <div style="font-size:.82rem;font-weight:700;color:${c}">Route Risk · ${risk.level}</div>
+            <div style="font-size:.65rem;color:var(--muted)">${esc(from)} → ${esc(to)} · ${d.route_km} km</div>
+          </div>
+        </div>
+        <div style="font-size:.70rem;color:var(--text);margin-top:6px;line-height:1.7">
+          🚧 รายงานค้างแก้ตลอดเส้นทาง: <b>${d.total_tickets}</b> รายการ · ซ้ำซาก <b style="color:#fc8181">${d.repeat_clusters}</b> จุด<br>
+          🌬️ PM2.5 (${esc(d.aqi_station||'—')}): <b>${(d.pm25_ugm3||0).toFixed(1)} µg/m³</b>
+          ${d.weather?.rain_risk && !d.weather.rain_risk.startsWith('ต่ำ') ? `<br>🌧️ ฝน: ${esc(d.weather.rain_risk)}` : ''}
+        </div>
+        <div style="font-size:.60rem;color:var(--muted);margin-top:4px">
+          Real-time overlay: AQI ${risk.components.aqi} · ถนน ${risk.components.traffy} · ฝน ${risk.components.weather} (จาก 10) · 6-layer engine
+        </div>
+      </div>`;
+    drawRouteOnMap(d);
+  } catch(e) {
+    result.innerHTML = `<div style="color:var(--red);font-size:.74rem;margin-top:4px">⚠ ${esc(e.message)}</div>`;
+  }
+}
+
+/* ═══════════ ROUTE MAP VISUALIZATION ═══════════ */
+function drawRouteOnMap(data) {
+  clearRoute();
+  const wps = data.waypoints || [];
+  if (!wps.length) return;
+
+  routeLayer = L.layerGroup();
+  const risk  = data.compound_risk;
+  const color = risk.color;
+  const lls   = wps.map(w => [w.lat, w.lon]);
+  const maxNearby = Math.max(...wps.map(w => w.nearby), 1);
+
+  // Route line
+  L.polyline(lls, { color, weight: 4, opacity: 0.72, dashArray: '9 5' }).addTo(routeLayer);
+
+  // Waypoint circles — size & color by nearby ticket count
+  wps.forEach((w, i) => {
+    const isEnd   = i === 0 || i === wps.length - 1;
+    const frac    = w.nearby / maxNearby;
+    const r       = isEnd ? 10 : Math.max(4, Math.round(4 + frac * 10));
+    const col     = isEnd ? color : (frac > .6 ? '#fc8181' : frac > .3 ? '#F6AD55' : '#48bb78');
+    const circle  = L.circleMarker([w.lat, w.lon], {
+      radius: r, color: col, fillColor: col,
+      fillOpacity: isEnd ? 1 : 0.65, weight: isEnd ? 2.5 : 1,
+    });
+    if (isEnd) {
+      const lbl = i === 0 ? `🟢 ${esc(data.from_district)}` : `🔴 ${esc(data.to_district)}`;
+      circle.bindPopup(`<div class="pc"><div class="ph">${lbl}</div>
+        <div class="ps">Compound Risk ${risk.score}/10 · ${risk.level}</div></div>`);
+    } else {
+      circle.bindTooltip(`${w.nearby} รายการค้างแก้ใกล้จุดนี้`, { direction: 'top' });
+    }
+    circle.addTo(routeLayer);
+  });
+
+  // Floating label at destination
+  const dest = wps[wps.length - 1];
+  L.marker([dest.lat, dest.lon], {
+    icon: L.divIcon({
+      className: '',
+      html: `<div style="background:${color};color:#0d1117;font-size:0.68rem;font-weight:800;
+               padding:2px 8px;border-radius:12px;white-space:nowrap;box-shadow:0 1px 4px #0006">
+               ${esc(data.to_district)} · Risk ${risk.score}</div>`,
+      iconAnchor: [-8, 8],
+    }),
+  }).addTo(routeLayer);
+
+  routeLayer.addTo(map);
+  map.fitBounds(L.latLngBounds(lls).pad(0.25));
+
+  document.getElementById('route-clear-btn').style.display = '';
+  setIns(`🗺️ Route ${esc(data.from_district)} → ${esc(data.to_district)} · ${data.route_km} km · Risk ${risk.score}/10 ${risk.level} · ${data.total_tickets} รายการค้างแก้ตลอดเส้นทาง`);
+
+  if (window.innerWidth > 768) switchTab('map');
+}
+
+function clearRoute() {
+  if (routeLayer) { map.removeLayer(routeLayer); routeLayer = null; }
+  document.getElementById('route-clear-btn').style.display = 'none';
+}
+
+/* ═══════════ SHARE LINK ═══════════ */
+function shareDistrict(district) {
+  const url = `${location.origin}${location.pathname}?district=${encodeURIComponent(district)}`;
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(url).then(() => showToast(`📋 คัดลอกลิงก์เขต${district} แล้ว`));
+  } else {
+    prompt('คัดลอก URL:', url);
+  }
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2400);
+}
+
+function scrollToDistrict(district) {
+  const rows = document.querySelectorAll('#screener-body tr');
+  for (const row of rows) {
+    if (row.textContent.includes(district) && !row.classList.contains('trend-row')) {
+      row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      row.style.transition = 'background .3s';
+      row.style.background = 'rgba(246,173,85,.18)';
+      setTimeout(() => { row.style.background = ''; }, 2200);
+      break;
+    }
+  }
+}
+
+// Read ?district= on page load
+(function() {
+  const p = new URLSearchParams(location.search);
+  const d = p.get('district');
+  if (d) {
+    window._urlDistrict = d;
+    // Switch to screener after DOMContentLoaded
+    document.addEventListener('DOMContentLoaded', () => switchPanel('screener'), { once: true });
+    // Fallback if already loaded
+    if (document.readyState !== 'loading') switchPanel('screener');
+  }
+})();
+
+/* ═══════════ MOBILE TABS ═══════════ */
+function switchTab(tab) {
+  const ch = document.getElementById('chat');
+  const tc = document.getElementById('t-chat');
+  const tm = document.getElementById('t-map');
+  if (tab === 'chat') {
+    ch.classList.add('open');
+    tc.classList.add('on'); tm.classList.remove('on');
+  } else {
+    ch.classList.remove('open');
+    tm.classList.add('on'); tc.classList.remove('on');
+  }
+}
+</script>
+</body>
+</html>

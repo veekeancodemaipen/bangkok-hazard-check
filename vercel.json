@@ -1,11 +1,15 @@
 {
   "version": 2,
-  "name": "bangkok-hazard-check",
+  "name": "bangkok-journey-intelligence",
   "builds": [
-    { "src": "hazard_check.html", "use": "@vercel/static" }
+    { "src": "*.html", "use": "@vercel/static" },
+    { "src": "*.json", "use": "@vercel/static" },
+    { "src": "*.geojson", "use": "@vercel/static" }
   ],
   "routes": [
-    { "src": "/", "dest": "/hazard_check.html" },
+    { "src": "/", "dest": "/safepath_demo_v2.html" },
+    { "src": "/demo", "dest": "/safepath_demo_v2.html" },
+    { "src": "/app", "dest": "/index.html" },
     { "src": "/(.*)", "dest": "/$1" }
   ]
 }

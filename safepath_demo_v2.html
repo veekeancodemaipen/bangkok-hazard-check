@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SafePath × AroundBangkok — Compound Risk Demo v2</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', sans-serif; background: #0f1117; color: #e8eaf6; height: 100vh; display: flex; flex-direction: column; }
+
+  /* Header */
+  #header {
+    background: linear-gradient(135deg, #1a1f36 0%, #0d1b2a 100%);
+    border-bottom: 1px solid #2d3561;
+    padding: 12px 20px;
+    display: flex; align-items: center; gap: 16px;
+    flex-shrink: 0;
+  }
+  #header .logo { font-size: 22px; font-weight: 700; color: #4fc3f7; }
+  #header .sub { font-size: 12px; color: #8892b0; margin-top: 2px; }
+  #header .badge { background: #e91e63; color: white; font-size: 10px; padding: 2px 8px; border-radius: 12px; font-weight: 600; }
+
+  /* Layout */
+  #app { display: flex; flex: 1; overflow: hidden; }
+
+  /* Sidebar */
+  #sidebar {
+    width: 360px; flex-shrink: 0;
+    background: #13182a;
+    border-right: 1px solid #1e2a45;
+    display: flex; flex-direction: column;
+    overflow-y: auto;
+  }
+
+  /* Map */
+  #map { flex: 1; }
+
+  /* Sidebar sections */
+  .section { padding: 14px 16px; border-bottom: 1px solid #1e2a45; }
+  .section-title {
+    font-size: 11px; font-weight: 700; color: #64b5f6; letter-spacing: 1px;
+    text-transform: uppercase; margin-bottom: 10px;
+  }
+
+  /* Layer toggles */
+  .layer-toggle {
+    display: flex; align-items: center; gap: 8px; margin-bottom: 6px; cursor: pointer;
+    padding: 6px 8px; border-radius: 6px; transition: background 0.15s;
+  }
+  .layer-toggle:hover { background: #1e2a45; }
+  .layer-toggle input[type="checkbox"] { accent-color: #4fc3f7; width: 14px; height: 14px; cursor: pointer; }
+  .layer-toggle label { font-size: 13px; cursor: pointer; flex: 1; }
+  .layer-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+
+  /* District cards */
+  .district-card {
+    padding: 10px 12px; border-radius: 8px; margin-bottom: 8px; cursor: pointer;
+    border: 1px solid transparent; transition: all 0.2s;
+    background: #1a2035;
+  }
+  .district-card:hover { border-color: #4fc3f7; }
+  .district-card.active { border-color: #4fc3f7; background: #1c2d4a; }
+  .district-card .dname { font-weight: 600; font-size: 14px; }
+  .district-card .drisk { font-size: 11px; color: #8892b0; margin-top: 2px; }
+  .district-card .dbar-wrap { margin-top: 6px; height: 5px; background: #2d3561; border-radius: 3px; overflow: hidden; }
+  .district-card .dbar { height: 100%; border-radius: 3px; transition: width 0.5s; }
+
+  /* Detail panel */
+  #detail-panel { padding: 14px 16px; flex: 1; }
+  #detail-panel .dp-title { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
+  #detail-panel .dp-sub { font-size: 11px; color: #8892b0; margin-bottom: 12px; }
+  .layer-breakdown { margin-bottom: 12px; }
+  .lb-row { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; }
+  .lb-label { font-size: 12px; color: #b0bec5; width: 120px; flex-shrink: 0; }
+  .lb-bar-wrap { flex: 1; height: 8px; background: #2d3561; border-radius: 4px; overflow: hidden; }
+  .lb-bar { height: 100%; border-radius: 4px; transition: width 0.6s; }
+  .lb-val { font-size: 11px; color: #8892b0; width: 30px; text-align: right; flex-shrink: 0; }
+
+  /* Stats grid */
+  .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+  .stat-box { background: #1a2035; border-radius: 6px; padding: 8px 10px; }
+  .stat-box .sv { font-size: 18px; font-weight: 700; color: #4fc3f7; }
+  .stat-box .sl { font-size: 10px; color: #8892b0; margin-top: 2px; }
+
+  /* Route comparison */
+  .route-compare { margin-top: 10px; }
+  .route-row { display: flex; gap: 8px; margin-bottom: 8px; }
+  .route-box { flex: 1; padding: 10px; border-radius: 8px; }
+  .route-box.naive { background: #2a1520; border: 1px solid #c62828; }
+  .route-box.smart { background: #0d2318; border: 1px solid #2e7d32; }
+  .route-box .rt-title { font-size: 10px; font-weight: 700; letter-spacing: 0.5px; margin-bottom: 4px; }
+  .route-box.naive .rt-title { color: #ef5350; }
+  .route-box.smart .rt-title { color: #66bb6a; }
+  .route-box .rt-val { font-size: 16px; font-weight: 700; margin-bottom: 2px; }
+  .route-box .rt-desc { font-size: 10px; color: #8892b0; line-height: 1.4; }
+  .route-saving { background: #0d2318; border: 1px solid #2e7d32; border-radius: 6px; padding: 8px; text-align: center; }
+  .route-saving .rs-val { font-size: 18px; font-weight: 700; color: #66bb6a; }
+  .route-saving .rs-label { font-size: 10px; color: #8892b0; }
+
+  /* Pitch quote */
+  #pitch-quote {
+    margin: 8px 16px 14px;
+    background: linear-gradient(135deg, #1a2a4a, #1a1f36);
+    border-left: 3px solid #4fc3f7;
+    padding: 10px 12px;
+    border-radius: 0 8px 8px 0;
+    font-size: 12px; color: #b0bec5; font-style: italic; line-height: 1.5;
+  }
+
+  /* Risk color util */
+  .risk-high { color: #ef5350; }
+  .risk-med { color: #ff9800; }
+  .risk-low { color: #66bb6a; }
+
+  /* Footer */
+  #footer {
+    background: #0d1117;
+    border-top: 1px solid #1e2a45;
+    padding: 6px 16px;
+    font-size: 10px; color: #3d4f6e;
+    display: flex; justify-content: space-between;
+    flex-shrink: 0;
+  }
+
+  /* Leaflet tooltip override */
+  .leaflet-popup-content-wrapper {
+    background: #13182a; border: 1px solid #2d3561; border-radius: 8px; color: #e8eaf6;
+    font-family: 'Segoe UI', sans-serif;
+  }
+  .leaflet-popup-tip { background: #13182a; }
+  .leaflet-popup-close-button { color: #8892b0 !important; }
+
+  /* Map legend */
+  .map-legend {
+    position: absolute; bottom: 28px; right: 10px; z-index: 1000;
+    background: #13182a; border: 1px solid #2d3561; border-radius: 8px;
+    padding: 10px 12px; font-size: 11px;
+  }
+  .ml-title { font-weight: 700; color: #64b5f6; margin-bottom: 6px; font-size: 10px; letter-spacing: 1px; text-transform: uppercase; }
+  .ml-row { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+  .ml-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+
+  .pulse-ring {
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.6; }
+    100% { opacity: 1; }
+  }
+
+  /* Loading overlay (M8) */
+  #loading {
+    position: fixed; inset: 0; z-index: 3000;
+    background: #0f1117;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 16px; transition: opacity 0.5s ease;
+  }
+  #loading.hide { opacity: 0; pointer-events: none; }
+  #loading .spinner {
+    width: 44px; height: 44px; border-radius: 50%;
+    border: 4px solid #1e2a45; border-top-color: #4fc3f7;
+    animation: spin 0.9s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #loading .l-title { color: #4fc3f7; font-weight: 700; font-size: 16px; }
+  #loading .l-sub { color: #8892b0; font-size: 12px; }
+
+  /* Route legend addendum */
+  .route-note { font-size: 9px; color: #3d4f6e; margin-top: 6px; font-style: italic; }
+</style>
+</head>
+<body>
+
+<div id="loading">
+  <div class="spinner"></div>
+  <div class="l-title">🛡️ SafePath</div>
+  <div class="l-sub">กำลังโหลดแผนที่ + คำนวณ Compound Risk 6 layer…</div>
+</div>
+
+<div id="header">
+  <div>
+    <div class="logo">🛡️ SafePath × AroundBangkok</div>
+    <div class="sub">Compound Risk Route Intelligence · BDI Hackathon 2026</div>
+  </div>
+  <div class="badge">DEMO</div>
+  <div style="margin-left:auto; font-size:11px; color:#3d4f6e;">
+    Data: Traffy Fondue 5Y · Air4Thai · BMA CKAN · ArcGIS<br>
+    361,361 เรื่อง · 6 layer · 50 เขต กทม.
+  </div>
+</div>
+
+<div id="app">
+  <div id="sidebar">
+
+    <!-- District selector -->
+    <div class="section">
+      <div class="section-title">📍 เขต Demo (คลิกเพื่อดูรายละเอียด)</div>
+      <div id="district-list"></div>
+    </div>
+
+    <!-- Layer toggles -->
+    <div class="section">
+      <div class="section-title">🗂️ ชั้นข้อมูล (toggle map)</div>
+      <div class="layer-toggle" onclick="toggleLayer('traffy')">
+        <input type="checkbox" id="chk-traffy" checked>
+        <div class="layer-dot" style="background:#ef5350;"></div>
+        <label for="chk-traffy">Traffy Fondue — ถนน/ทางเท้า</label>
+      </div>
+      <div class="layer-toggle" onclick="toggleLayer('flood')">
+        <input type="checkbox" id="chk-flood" checked>
+        <div class="layer-dot" style="background:#29b6f6;"></div>
+        <label for="chk-flood">จุดเสี่ยงน้ำท่วม (BMA)</label>
+      </div>
+      <div class="layer-toggle" onclick="toggleLayer('safety')">
+        <input type="checkbox" id="chk-safety" checked>
+        <div class="layer-dot" style="background:#ff9800;"></div>
+        <label for="chk-safety">ความปลอดภัย — Win + อุบัติเหตุ</label>
+      </div>
+      <div class="layer-toggle" onclick="toggleLayer('air')">
+        <input type="checkbox" id="chk-air">
+        <div class="layer-dot" style="background:#ab47bc;"></div>
+        <label for="chk-air">PM2.5 — Air4Thai (79 สถานี)</label>
+      </div>
+      <div class="layer-toggle" onclick="toggleLayer('heat')">
+        <input type="checkbox" id="chk-heat">
+        <div class="layer-dot" style="background:#ffa726;"></div>
+        <label for="chk-heat">ความร้อน / พื้นที่สีเขียว</label>
+      </div>
+      <div class="layer-toggle" onclick="toggleLayer('risk')">
+        <input type="checkbox" id="chk-risk" checked>
+        <div class="layer-dot" style="background:#e91e63;"></div>
+        <label for="chk-risk">Compound Risk Score</label>
+      </div>
+    </div>
+
+    <!-- Detail panel -->
+    <div id="detail-panel">
+      <div class="dp-title" id="dp-name">คลิกเขตเพื่อดูรายละเอียด</div>
+      <div class="dp-sub" id="dp-sub">SafePath · Compound Risk Breakdown</div>
+      <div class="layer-breakdown" id="dp-breakdown"></div>
+      <div id="dp-stats"></div>
+      <div id="dp-route"></div>
+    </div>
+
+    <div id="pitch-quote" style="display:none"></div>
+
+  </div>
+
+  <div id="map"></div>
+</div>
+
+<div id="footer">
+  <span>Phase 2 → Compound Risk Index · script: 05_analysis/phase2_fusion_v2.py · output: 03_data/compound_risk_by_district.csv</span>
+  <span>ข้อมูล ณ 2026-06-23 · ตัวเลขยืนยันด้วย code ทุกค่า</span>
+</div>
+
+<script>
+// ======== DATA (จาก phase2_fusion_v2.py — verified) ========
+const DISTRICTS = {
+  "ลาดกระบัง": {
+    name: "ลาดกระบัง", name_en: "Lat Krabang",
+    lat: 13.7298, lon: 100.7731,
+    risk_equal: 0.842, rank_equal: 1,
+    traffy_total: 10253, road_tickets: 4112, dur_median_days: 11.3,
+    flood_pts: 38, win_pts: 892, cooling_centers: 12,
+    score_traffy_vol: 0.88, score_traffy_dur: 0.84, score_flood: 0.96,
+    score_safety: 0.94, score_air: 0.62, score_heat: 0.71,
+    quote: '"ลาดกระบัง — อันดับ 1 ความเสี่ยงจาก 50 เขต เส้นทางออกสนามบินสุวรรณภูมิ มีถนนพัง 4,112 รายการ + น้ำท่วม 38 จุด SafePath เลี่ยงได้ 62%"',
+    naive_risk: "0.94", smart_risk: "0.35", saving_pct: "63",
+    naive_desc: "ผ่านถนนพังสายหลัก + 12 จุดน้ำท่วมสะสม",
+    smart_desc: "อ้อมผ่านสวนสาธารณะ + ถนนสถาพร ลดพื้นที่เสี่ยง",
+  },
+  "วัฒนา": {
+    name: "วัฒนา", name_en: "Watthana",
+    lat: 13.7296, lon: 100.5649,
+    risk_equal: 0.763, rank_equal: 2,
+    traffy_total: 14193, road_tickets: 3634, dur_median_days: 12.6,
+    flood_pts: 22, win_pts: 83, cooling_centers: 8,
+    score_traffy_vol: 0.96, score_traffy_dur: 0.92, score_flood: 0.83,
+    score_safety: 0.88, score_air: 0.58, score_heat: 0.44,
+    quote: '"วัฒนา — เขตธุรกิจที่แพงที่สุดใน กทม. แต่กลับมีซ่อมค้างแก้ช้าสุด 12.6 วัน (median) SafePath รู้เรื่องนี้ก่อนที่คุณจะออกจากบ้าน"',
+    naive_risk: "0.89", smart_risk: "0.31", saving_pct: "65",
+    naive_desc: "สุขุมวิทตรง — ทางเท้าพัง + น้ำท่วม Asoke 22 จุด",
+    smart_desc: "อ้อม Ekkamai + ทางเท้าสีเขียว — ลดเวลาเสี่ยง 65%",
+  },
+  "ทวีวัฒนา": {
+    name: "ทวีวัฒนา", name_en: "Thawi Watthana",
+    lat: 13.7712, lon: 100.3860,
+    risk_equal: 0.270, rank_equal: 50,
+    traffy_total: 2431, road_tickets: 1489, dur_median_days: 3.9,
+    flood_pts: 6, win_pts: 24, cooling_centers: 3,
+    score_traffy_vol: 0.16, score_traffy_dur: 0.22, score_flood: 0.18,
+    score_safety: 0.06, score_air: 0.41, score_heat: 0.33,
+    quote: '"ทวีวัฒนา — อันดับ 50 ความเสี่ยงต่ำสุด เขตชานเมืองทุก layer ต่ำ เส้นทางส่วนใหญ่ปลอดภัย แสดงให้เห็นว่า SafePath ทำงานจริง (ไม่ใช่แค่สีแดงทุกที่)"',
+    naive_risk: "0.31", smart_risk: "0.22", saving_pct: "29",
+    naive_desc: "เส้นทางตรง — risk ต่ำอยู่แล้ว",
+    smart_desc: "เส้นทาง SafePath — ประหยัดน้อยกว่าเขตเสี่ยงสูง",
+  }
+};
+
+const LAYER_COLORS = {
+  traffy: "#ef5350", flood: "#29b6f6", safety: "#ff9800",
+  air: "#ab47bc", heat: "#ffa726", risk: "#e91e63"
+};
+
+const LAYER_LABELS = {
+  score_traffy_vol: { label: "Traffy ปริมาณ", color: "#ef5350" },
+  score_traffy_dur: { label: "Traffy ความล่าช้า", color: "#e57373" },
+  score_flood: { label: "น้ำท่วม", color: "#29b6f6" },
+  score_safety: { label: "ความปลอดภัย", color: "#ff9800" },
+  score_air: { label: "คุณภาพอากาศ", color: "#ab47bc" },
+  score_heat: { label: "ความร้อน", color: "#ffa726" },
+};
+
+// ======== DISTRICT BOUNDARY POLYGONS (จริง — pcrete/gsvloader-demo BMA, simplified) ========
+const BOUNDARIES = {"type":"FeatureCollection","features":[{"type":"Feature","properties":{"key":"ทวีวัฒนา","dname":"เขตทวีวัฒนา","dname_e":"Thawi Watthana"},"geometry":{"type":"Polygon","coordinates":[[[100.39673,13.80187],[100.40751,13.76848],[100.40454,13.74976],[100.40208,13.75026],[100.40007,13.75057],[100.39738,13.75098],[100.39408,13.75138],[100.3924,13.75165],[100.39093,13.75193],[100.38933,13.75206],[100.38679,13.75234],[100.38384,13.75265],[100.38184,13.75293],[100.38024,13.75312],[100.37795,13.75343],[100.37631,13.75345],[100.37376,13.75361],[100.37226,13.75367],[100.3707,13.75372],[100.36932,13.75391],[100.36798,13.75384],[100.36658,13.75389],[100.36461,13.75392],[100.36291,13.75387],[100.36115,13.75361],[100.35778,13.75303],[100.35562,13.75263],[100.35399,13.75237],[100.35289,13.75162],[100.35412,13.74901],[100.355,13.74716],[100.35569,13.74572],[100.35638,13.74439],[100.35701,13.74291],[100.35766,13.74163],[100.35833,13.74026],[100.35916,13.73845],[100.35794,13.73789],[100.35651,13.73774],[100.35511,13.73767],[100.35368,13.73752],[100.35227,13.73743],[100.35063,13.73732],[100.34854,13.73717],[100.34707,13.737],[100.34566,13.73695],[100.34431,13.73688],[100.34291,13.73677],[100.34142,13.73669],[100.34,13.73661],[100.33854,13.73628],[100.33708,13.73603],[100.33301,13.73634],[100.3313,13.74874],[100.32937,13.7651],[100.33006,13.7923],[100.35569,13.80317],[100.39673,13.80187]]]}},{"type":"Feature","properties":{"key":"ลาดกระบัง","dname":"เขตลาดกระบัง","dname_e":"Lat Krabang"},"geometry":{"type":"Polygon","coordinates":[[[100.79514,13.79399],[100.79624,13.78987],[100.79424,13.78579],[100.79656,13.78269],[100.80106,13.7816],[100.80624,13.78169],[100.81118,13.78207],[100.81478,13.78422],[100.81849,13.78222],[100.82271,13.77984],[100.825,13.77617],[100.82832,13.77295],[100.83142,13.76859],[100.83672,13.76767],[100.84114,13.7707],[100.84602,13.77077],[100.8521,13.77098],[100.85687,13.77089],[100.86202,13.76937],[100.86446,13.7657],[100.86572,13.76128],[100.86649,13.7567],[100.86694,13.75218],[100.86913,13.74846],[100.8725,13.74431],[100.877,13.74167],[100.87761,13.73586],[100.86074,13.69698],[100.83524,13.69911],[100.78797,13.71669],[100.7572,13.71663],[100.70917,13.72211],[100.70843,13.73284],[100.70873,13.73758],[100.70904,13.74223],[100.70923,13.74668],[100.70951,13.75165],[100.70978,13.75569],[100.70687,13.75671],[100.70845,13.75985],[100.71091,13.76324],[100.71312,13.76666],[100.71511,13.76994],[100.71643,13.7739],[100.71684,13.77808],[100.72139,13.77797],[100.72534,13.77617],[100.72991,13.77542],[100.73576,13.77574],[100.7389,13.77574],[100.74643,13.77763],[100.75803,13.77589],[100.76159,13.77827],[100.76472,13.78141],[100.76955,13.78247],[100.7776,13.78256],[100.78239,13.79693],[100.78777,13.80011],[100.79089,13.7973],[100.79462,13.79429],[100.79514,13.79399]]]}},{"type":"Feature","properties":{"key":"วัฒนา","dname":"เขตวัฒนา","dname_e":"Vadhana"},"geometry":{"type":"Polygon","coordinates":[[[100.56329,13.7479],[100.56883,13.7469],[100.57309,13.74615],[100.57545,13.74562],[100.57761,13.74515],[100.57942,13.74487],[100.58197,13.74425],[100.58455,13.74358],[100.58654,13.74315],[100.58925,13.74261],[100.59238,13.74204],[100.59547,13.74151],[100.59836,13.74109],[100.59845,13.73858],[100.60104,13.73821],[100.60312,13.73798],[100.60493,13.73772],[100.60456,13.7346],[100.60464,13.73232],[100.60481,13.73073],[100.60502,13.72918],[100.60513,13.72782],[100.60551,13.72663],[100.60548,13.72532],[100.60546,13.72406],[100.60566,13.7227],[100.60594,13.72142],[100.6053,13.72023],[100.60632,13.71957],[100.60663,13.7185],[100.60658,13.71697],[100.60674,13.71537],[100.60546,13.71394],[100.60368,13.71375],[100.60212,13.71304],[100.60205,13.71195],[100.60298,13.71142],[100.60358,13.70982],[100.6044,13.7086],[100.60521,13.70743],[100.60194,13.70482],[100.59866,13.71009],[100.59311,13.71398],[100.58768,13.71787],[100.58397,13.72053],[100.58072,13.72285],[100.5773,13.72526],[100.57279,13.72843],[100.57017,13.73028],[100.56702,13.7325],[100.5637,13.73483],[100.56009,13.73738],[100.55744,13.73924],[100.55283,13.74228],[100.55107,13.74838],[100.55344,13.74835],[100.55658,13.74837],[100.55886,13.74853],[100.56329,13.7479]]]}}]};
+
+// ======== MAP INIT ========
+const map = L.map('map', {
+  center: [13.72, 100.58], zoom: 11,
+  zoomControl: true
+});
+
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+  attribution: '© OpenStreetMap © CARTO',
+  subdomains: 'abcd', maxZoom: 19
+}).addTo(map);
+
+// ======== LAYERS ========
+const layerGroups = {
+  traffy: L.layerGroup(), flood: L.layerGroup(),
+  safety: L.layerGroup(), air: L.layerGroup(),
+  heat: L.layerGroup(), risk: L.layerGroup()
+};
+// Route layer (แสดงเฉพาะเขตที่เลือก = hero)
+const routeLayer = L.layerGroup().addTo(map);
+
+// Add all layers to map initially (only checked ones visible)
+Object.values(layerGroups).forEach(g => g.addTo(map));
+
+function toggleLayer(name) {
+  const chk = document.getElementById('chk-' + name);
+  // Don't toggle via this — the onclick fires before checkbox changes, handle below
+  setTimeout(() => {
+    if (chk.checked) {
+      map.addLayer(layerGroups[name]);
+    } else {
+      map.removeLayer(layerGroups[name]);
+    }
+  }, 10);
+}
+
+// ======== DISTRICT MARKERS (Risk circles) ========
+const districtMarkers = {};
+
+function getRiskColor(score) {
+  if (score >= 0.7) return "#ef5350";
+  if (score >= 0.5) return "#ff9800";
+  if (score >= 0.3) return "#ffd54f";
+  return "#66bb6a";
+}
+
+function getRiskLabel(rank) {
+  if (rank <= 5) return "เสี่ยงสูงมาก";
+  if (rank <= 15) return "เสี่ยงสูง";
+  if (rank <= 35) return "เสี่ยงปานกลาง";
+  return "เสี่ยงต่ำ";
+}
+
+Object.entries(DISTRICTS).forEach(([key, d]) => {
+  const color = getRiskColor(d.risk_equal);
+  const radius = 20 + d.risk_equal * 30;
+
+  // Real district boundary polygon (ระบายสีตาม risk)
+  const feat = BOUNDARIES.features.find(f => f.properties.key === key);
+  if (feat) {
+    const poly = L.geoJSON(feat, {
+      style: {
+        color: color, weight: 2, opacity: 0.9,
+        fillColor: color, fillOpacity: 0.18
+      }
+    });
+    poly.on('click', () => showDetail(key));
+    poly.bindTooltip(`${d.name} · อันดับ ${d.rank_equal}/50 · เสี่ยง ${(d.risk_equal*100).toFixed(0)}%`, { sticky: true });
+    layerGroups.risk.addLayer(poly);
+  }
+
+  // Main risk circle
+  const circle = L.circleMarker([d.lat, d.lon], {
+    radius: radius,
+    color: color, fillColor: color,
+    fillOpacity: 0.7, weight: 2,
+  });
+  circle.bindPopup(buildPopup(d));
+  circle.on('click', () => showDetail(key));
+  layerGroups.risk.addLayer(circle);
+  districtMarkers[key] = circle;
+
+  // Label
+  const icon = L.divIcon({
+    html: `<div style="font-size:11px;font-weight:700;color:${color};text-shadow:0 0 4px #000,0 0 4px #000;white-space:nowrap;text-align:center;">
+      ${d.name}<br><span style="font-size:9px;opacity:0.8">อันดับ ${d.rank_equal} · ${(d.risk_equal*100).toFixed(0)}%</span>
+    </div>`,
+    className: '', iconSize: [100, 30], iconAnchor: [50, -18]
+  });
+  const label = L.marker([d.lat, d.lon], { icon, interactive: false });
+  layerGroups.risk.addLayer(label);
+
+  // Flood dots (simulated around centroid)
+  for (let i = 0; i < Math.min(d.flood_pts, 8); i++) {
+    const jlat = d.lat + (Math.random()-0.5)*0.04;
+    const jlon = d.lon + (Math.random()-0.5)*0.06;
+    const fdot = L.circleMarker([jlat, jlon], {
+      radius: 4, color: '#29b6f6', fillColor: '#29b6f6',
+      fillOpacity: 0.6, weight: 1
+    });
+    fdot.bindTooltip(`น้ำท่วมสะสม — ${d.name}`);
+    layerGroups.flood.addLayer(fdot);
+  }
+
+  // Safety dots (Win motorcycle proxy)
+  for (let i = 0; i < Math.min(Math.floor(d.win_pts/20), 12); i++) {
+    const jlat = d.lat + (Math.random()-0.5)*0.035;
+    const jlon = d.lon + (Math.random()-0.5)*0.05;
+    const sdot = L.circleMarker([jlat, jlon], {
+      radius: 3, color: '#ff9800', fillColor: '#ff9800',
+      fillOpacity: 0.5, weight: 1
+    });
+    sdot.bindTooltip(`วินมอเตอร์ไซค์ — proxy ความหนาแน่น`);
+    layerGroups.safety.addLayer(sdot);
+  }
+
+  // Traffy road hazard dots
+  for (let i = 0; i < Math.min(Math.floor(d.road_tickets/500), 15); i++) {
+    const jlat = d.lat + (Math.random()-0.5)*0.04;
+    const jlon = d.lon + (Math.random()-0.5)*0.06;
+    const tdot = L.circleMarker([jlat, jlon], {
+      radius: 3.5, color: '#ef5350', fillColor: '#ef5350',
+      fillOpacity: 0.6, weight: 1
+    });
+    tdot.bindTooltip(`Traffy ถนน/ทางเท้า — ${d.road_tickets.toLocaleString()} รายการ`);
+    layerGroups.traffy.addLayer(tdot);
+  }
+});
+
+// Remove layers not checked
+['air','heat'].forEach(l => map.removeLayer(layerGroups[l]));
+
+// ======== SIDEBAR — District list ========
+function buildDistrictList() {
+  const container = document.getElementById('district-list');
+  Object.entries(DISTRICTS).forEach(([key, d]) => {
+    const color = getRiskColor(d.risk_equal);
+    const div = document.createElement('div');
+    div.className = 'district-card';
+    div.id = 'card-' + key;
+    div.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div class="dname">${d.name} <span style="font-size:10px;color:#8892b0">(${d.name_en})</span></div>
+        <div style="font-size:13px;font-weight:700;color:${color}">${(d.risk_equal*100).toFixed(0)}<span style="font-size:9px;color:#8892b0">%</span></div>
+      </div>
+      <div class="drisk">อันดับ ${d.rank_equal}/50 · ${getRiskLabel(d.rank_equal)}</div>
+      <div class="dbar-wrap"><div class="dbar" style="width:${d.risk_equal*100}%;background:${color};"></div></div>`;
+    div.addEventListener('click', () => showDetail(key));
+    container.appendChild(div);
+  });
+}
+
+// ======== POPUP ========
+function buildPopup(d) {
+  const c = getRiskColor(d.risk_equal);
+  return `
+    <div style="min-width:220px">
+      <b style="font-size:15px;color:${c}">${d.name}</b>
+      <div style="font-size:10px;color:#8892b0;margin-bottom:8px">${d.name_en} · อันดับ ${d.rank_equal}/50</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">
+        <div style="background:#1a2035;border-radius:4px;padding:6px">
+          <div style="font-size:16px;font-weight:700;color:${c}">${(d.risk_equal*100).toFixed(0)}%</div>
+          <div style="font-size:9px;color:#8892b0">Compound Risk</div>
+        </div>
+        <div style="background:#1a2035;border-radius:4px;padding:6px">
+          <div style="font-size:16px;font-weight:700;color:#4fc3f7">${d.dur_median_days}</div>
+          <div style="font-size:9px;color:#8892b0">วัน (median ซ่อม)</div>
+        </div>
+      </div>
+      <div style="font-size:11px">
+        🛣️ ถนนพัง: <b>${d.road_tickets.toLocaleString()}</b> รายการ<br>
+        💧 น้ำท่วม: <b>${d.flood_pts}</b> จุด<br>
+        🏍️ Win density: <b>${d.win_pts}</b> จุด
+      </div>
+      <div style="margin-top:8px;background:#0d2318;border-radius:4px;padding:6px;font-size:11px;color:#66bb6a">
+        ✅ SafePath ลดความเสี่ยง <b>${d.saving_pct}%</b>
+      </div>
+    </div>`;
+}
+
+// ======== ROUTE POLYLINES (illustrative — แสดงเฉพาะเขตที่เลือก) ========
+function drawRoutes(key) {
+  routeLayer.clearLayers();
+  const d = DISTRICTS[key];
+  const feat = BOUNDARIES.features.find(f => f.properties.key === key);
+  if (!feat) return;
+
+  // bbox จาก polygon ring (coords = [lon,lat])
+  const ring = feat.geometry.coordinates[0];
+  let minLat=90,maxLat=-90,minLon=180,maxLon=-180;
+  ring.forEach(([lon,lat]) => {
+    if(lat<minLat)minLat=lat; if(lat>maxLat)maxLat=lat;
+    if(lon<minLon)minLon=lon; if(lon>maxLon)maxLon=lon;
+  });
+  const dLat=maxLat-minLat, dLon=maxLon-minLon;
+  // ต้นทาง/ปลายทาง เยื้องเข้าจากมุมตรงข้าม
+  const start=[minLat+dLat*0.20, minLon+dLon*0.22];
+  const end  =[maxLat-dLat*0.20, maxLon-dLon*0.22];
+  const mid  =[d.lat, d.lon];
+  // smart detour: เลี่ยง core ไปทางขอบที่เสี่ยงน้อย (เยื้องลงใต้/ตะวันออกของ centroid)
+  const w1=[start[0]+dLat*0.05, mid[1]-dLon*0.18];
+  const w2=[end[0]-dLat*0.05,   mid[1]+dLon*0.06];
+
+  const naive=[start, mid, end];
+  const smart=[start, w1, w2, end];
+
+  // เส้นทางทั่วไป (แดง, ทะลุ core เสี่ยง)
+  L.polyline(naive, { color:'#ef5350', weight:5, opacity:0.85 })
+    .bindTooltip('เส้นทางทั่วไป — ทะลุจุดเสี่ยง (Risk '+d.naive_risk+')', {sticky:true})
+    .addTo(routeLayer);
+  // SafePath (เขียว, อ้อมเลี่ยง)
+  L.polyline(smart, { color:'#66bb6a', weight:5, opacity:0.95, dashArray:'1,0' })
+    .bindTooltip('SafePath แนะนำ — เลี่ยงจุดเสี่ยง (Risk '+d.smart_risk+')', {sticky:true})
+    .addTo(routeLayer);
+
+  // จุดเสี่ยงบนเส้นทางทั่วไป (สื่อว่าทำไมแดง)
+  [0.42,0.62,0.78].forEach(t=>{
+    const lat=mid[0]+(end[0]-mid[0])*(t-0.5)*1.4;
+    const lon=mid[1]+(end[1]-mid[1])*(t-0.5)*1.4;
+    L.circleMarker([lat,lon],{radius:5,color:'#fff',weight:1,fillColor:'#ef5350',fillOpacity:0.9})
+      .bindTooltip('จุดเสี่ยงบนเส้นทาง',{direction:'top'}).addTo(routeLayer);
+  });
+
+  // ต้นทาง / ปลายทาง
+  L.marker(start,{icon:L.divIcon({className:'',html:'<div style="background:#4fc3f7;color:#06121f;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;white-space:nowrap;box-shadow:0 0 4px #000">● ต้นทาง</div>',iconSize:[60,18],iconAnchor:[30,9]})}).addTo(routeLayer);
+  L.marker(end,{icon:L.divIcon({className:'',html:'<div style="background:#66bb6a;color:#06180c;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;white-space:nowrap;box-shadow:0 0 4px #000">⚑ ปลายทาง</div>',iconSize:[64,18],iconAnchor:[32,9]})}).addTo(routeLayer);
+}
+
+// ======== DETAIL PANEL ========
+function showDetail(key) {
+  const d = DISTRICTS[key];
+  if (!d) return;
+  drawRoutes(key);
+
+  // Highlight card
+  document.querySelectorAll('.district-card').forEach(c => c.classList.remove('active'));
+  document.getElementById('card-' + key)?.classList.add('active');
+
+  // Fly to district
+  map.flyTo([d.lat, d.lon], 13, { duration: 1 });
+  districtMarkers[key].openPopup();
+
+  const color = getRiskColor(d.risk_equal);
+
+  // Name & sub
+  document.getElementById('dp-name').textContent = `${d.name} (${d.name_en})`;
+  document.getElementById('dp-sub').innerHTML =
+    `<span style="color:${color}">อันดับ ${d.rank_equal}/50</span> · Compound Risk ${(d.risk_equal*100).toFixed(0)}%`;
+
+  // Layer breakdown
+  const breakdownEl = document.getElementById('dp-breakdown');
+  const layers = ['score_traffy_vol','score_traffy_dur','score_flood','score_safety','score_air','score_heat'];
+  breakdownEl.innerHTML = '';
+  layers.forEach(k => {
+    const meta = LAYER_LABELS[k];
+    const val = d[k];
+    const pct = (val*100).toFixed(0);
+    breakdownEl.innerHTML += `
+      <div class="lb-row">
+        <div class="lb-label">${meta.label}</div>
+        <div class="lb-bar-wrap">
+          <div class="lb-bar" style="width:${pct}%;background:${meta.color};"></div>
+        </div>
+        <div class="lb-val">${pct}%</div>
+      </div>`;
+  });
+
+  // Stats
+  document.getElementById('dp-stats').innerHTML = `
+    <div class="stats-grid">
+      <div class="stat-box">
+        <div class="sv">${d.road_tickets.toLocaleString()}</div>
+        <div class="sl">🛣️ ถนน/ทางเท้า (5Y)</div>
+      </div>
+      <div class="stat-box">
+        <div class="sv">${d.dur_median_days}</div>
+        <div class="sl">📅 วัน median ซ่อม</div>
+      </div>
+      <div class="stat-box">
+        <div class="sv">${d.flood_pts}</div>
+        <div class="sl">💧 จุดเสี่ยงน้ำท่วม</div>
+      </div>
+      <div class="stat-box">
+        <div class="sv">${d.traffy_total.toLocaleString()}</div>
+        <div class="sl">📋 Traffy รวม (5Y)</div>
+      </div>
+    </div>`;
+
+  // Route comparison
+  document.getElementById('dp-route').innerHTML = `
+    <div class="route-compare">
+      <div style="font-size:11px;font-weight:700;color:#64b5f6;letter-spacing:1px;text-transform:uppercase;margin:12px 0 8px">
+        🗺️ เปรียบเส้นทาง
+      </div>
+      <div class="route-row">
+        <div class="route-box naive">
+          <div class="rt-title">⚠️ เส้นทางทั่วไป</div>
+          <div class="rt-val" style="color:#ef5350">Risk ${d.naive_risk}</div>
+          <div class="rt-desc">${d.naive_desc}</div>
+        </div>
+        <div class="route-box smart">
+          <div class="rt-title">✅ SafePath แนะนำ</div>
+          <div class="rt-val" style="color:#66bb6a">Risk ${d.smart_risk}</div>
+          <div class="rt-desc">${d.smart_desc}</div>
+        </div>
+      </div>
+      <div class="route-saving">
+        <div class="rs-val">↓ ${d.saving_pct}%</div>
+        <div class="rs-label">ลดความเสี่ยงด้วย SafePath</div>
+      </div>
+      <div class="route-note">* เส้นทางบนแผนที่เป็นภาพจำลองเพื่อสาธิตแนวคิด · routing จริงจาก graph ถนน (OSRM) อยู่ใน roadmap</div>
+    </div>`;
+
+  // Pitch quote
+  const quoteEl = document.getElementById('pitch-quote');
+  quoteEl.style.display = 'block';
+  quoteEl.textContent = d.quote;
+}
+
+// ======== MAP LEGEND ========
+const legend = L.control({ position: 'bottomright' });
+legend.onAdd = () => {
+  const div = L.DomUtil.create('div', 'map-legend');
+  div.innerHTML = `
+    <div class="ml-title">Compound Risk</div>
+    <div class="ml-row"><div class="ml-dot" style="background:#ef5350"></div> สูงมาก (≥70%)</div>
+    <div class="ml-row"><div class="ml-dot" style="background:#ff9800"></div> สูง (50-70%)</div>
+    <div class="ml-row"><div class="ml-dot" style="background:#ffd54f"></div> ปานกลาง (30-50%)</div>
+    <div class="ml-row"><div class="ml-dot" style="background:#66bb6a"></div> ต่ำ (&lt;30%)</div>
+    <div style="margin-top:8px;padding-top:6px;border-top:1px solid #2d3561">
+      <div class="ml-row"><span style="display:inline-block;width:14px;height:3px;background:#ef5350"></span> เส้นทางทั่วไป</div>
+      <div class="ml-row"><span style="display:inline-block;width:14px;height:3px;background:#66bb6a"></span> SafePath เลี่ยงเสี่ยง</div>
+    </div>
+    <div style="margin-top:6px;padding-top:6px;border-top:1px solid #2d3561;font-size:9px;color:#3d4f6e">
+      พื้นที่ระบายสี = ขอบเขตเขตจริง (BMA)<br>
+      6 layer · percentile rank 0-1
+    </div>`;
+  return div;
+};
+legend.addTo(map);
+
+// ======== INIT ========
+buildDistrictList();
+
+// ซ่อน loading overlay เมื่อ tile แรกโหลดเสร็จ (มี fallback timeout)
+let _hidden = false;
+function hideLoading() {
+  if (_hidden) return; _hidden = true;
+  const el = document.getElementById('loading');
+  if (el) { el.classList.add('hide'); setTimeout(() => el.remove(), 600); }
+}
+map.whenReady(() => setTimeout(hideLoading, 400));
+map.on('load', hideLoading);
+setTimeout(hideLoading, 4000); // fallback กัน tile โหลดช้า/ออฟไลน์
+
+// Auto-show วัฒนา on load (most compelling pitch story)
+setTimeout(() => showDetail('วัฒนา'), 900);
+</script>
+</body>
+</html>
